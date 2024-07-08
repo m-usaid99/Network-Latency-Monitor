@@ -1,0 +1,32 @@
+#!/bin/bash
+
+# Default values
+duration=10800  # 3 hours in seconds
+ip_address="8.8.8.8"
+
+# Parse arguments
+while getopts "t:i:" opt; do
+  case $opt in
+    t) duration=$OPTARG ;;
+    i) ip_address=$OPTARG ;;
+    \?) echo "Invalid option -$OPTARG" >&2 ;;
+  esac
+done
+
+# Get the current date and time
+current_date=$(date +%Y-%m-%d_%H-%M-%S)
+
+# Create directories for results and plots
+results_folder="results"
+plots_folder="plots/plots_$current_date"
+mkdir -p $results_folder
+mkdir -p $plots_folder
+
+# Define the filename for the ping results
+results_file="$results_folder/ping_results_$current_date.txt"
+
+# Run the ping command for the specified duration and save the results
+ping -i 1 -w $duration $ip_address > $results_file
+
+# Run the Python script to generate the plots
+python3 generate_plots.py $results_file $plots_folder $duration $ip_address
