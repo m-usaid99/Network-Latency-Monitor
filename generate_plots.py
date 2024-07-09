@@ -41,7 +41,7 @@ remaining_time = duration % 3600
 
 if full_hours < 1:
     # Plot the entire duration as a single plot if less than one hour
-    plt.figure(figsize=(20, 15))  # Increase the width and height of the graph
+    plt.figure(figsize=(25, 20))  # Increase the width and height of the graph
     plt.plot(df['Ping (ms)'])
     plt.title(f'WiFi Network Ping Over Time (Duration: {duration // 60} minutes, Max Value Capped at 1000 ms)')
     plt.xlabel('Time (seconds)')
