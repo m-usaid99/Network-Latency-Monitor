@@ -4,24 +4,26 @@
 duration=10800  # 3 hours in seconds
 ip_address="8.8.8.8"
 text_file=""
-log_file=""
+interval=1  # Default interval for ping command
 
 show_help() {
-  echo "Usage: $0 [-t duration] [-i ip_address] [-f text_file]"
+  echo "Usage: $0 [-t duration_in_seconds] [-i ip_address] [-f file_to_ping_results.txt] [-p ping_interval]"
   echo
   echo "Options:"
-  echo "  -t duration    Duration of the ping monitoring in seconds (default: 10800 seconds)"
-  echo "  -i ip_address  IP address to ping (default: 8.8.8.8)"
-  echo "  -f text_file   Path to an existing text file with ping results"
-  echo "  -h             Show this help message and exit"
+  echo "  -t duration_in_seconds  The amount of time to collect data for, in seconds. Default: 10800 seconds (3 hours)"
+  echo "  -i ip_address           The IP address to ping. Default: 8.8.8.8"
+  echo "  -f file_to_ping_results.txt  Path to an existing text file with ping results"
+  echo "  -p ping_interval        The interval between each ping in seconds. Default: 1 second"
+  echo "  -h                      Show this help message and exit"
 }
 
 # Parse arguments
-while getopts "t:i:f:h" opt; do
+while getopts "t:i:f:p:h" opt; do
   case $opt in
     t) duration=$OPTARG ;;
     i) ip_address=$OPTARG ;;
     f) text_file=$OPTARG ;;
+    p) interval=$OPTARG ;;
     h) show_help; exit 0 ;;
     \?) show_help; exit 1 ;;
   esac
@@ -46,7 +48,7 @@ if [ -n "$text_file" ]; then
   fi
 fi
 
-log "Parsed arguments: duration=$duration, ip_address=$ip_address, text_file=$text_file"
+log "Parsed arguments: duration=$duration, ip_address=$ip_address, text_file=$text_file, interval=$interval"
 
 # Create directories for results and plots
 results_folder="results"
@@ -62,12 +64,12 @@ if [ -n "$text_file" ]; then
   cp "$text_file" "$results_file"
   log "Copied text file $text_file to $results_file"
 else
-  log "Running ping command: ping -i 1 -w $duration $ip_address"
-  ping -i 1 -w $duration $ip_address > $results_file
+  log "Running ping command: ping -i $interval -w $duration $ip_address"
+  ping -i $interval -w $duration $ip_address > $results_file
   log "Ping command completed and results saved to $results_file"
 fi
 
 # Run the Python script to generate the plots
 log "Running Python script to generate plots"
-python3 generate_plots.py $results_file $plots_folder $duration $ip_address 2>&1 | tee -a $log_file
+python3 generate_plots.py $results_file $plots_folder $duration $ip_address $interval 2>&1 | tee -a $log_file
 log "Python script completed"

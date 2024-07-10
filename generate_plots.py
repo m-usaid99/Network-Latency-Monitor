@@ -10,7 +10,7 @@ import argparse
 # Use the Agg backend for matplotlib to improve performance in non-interactive environments
 matplotlib.use('Agg')
 
-# GLOBALS
+# Global configuration
 FIGSIZE = (30, 25)
 
 def initialize_logging():
@@ -25,6 +25,7 @@ def parse_arguments():
     parser.add_argument("plots_folder", help="Directory to save the plots")
     parser.add_argument("duration", type=int, help="Duration of the ping monitoring in seconds")
     parser.add_argument("ip_address", help="IP address to ping")
+    parser.add_argument("interval", type=int, help="Interval between pings in seconds")
     return parser.parse_args()
 
 def read_ping_results(file_path):
@@ -51,16 +52,17 @@ def extract_ping_data(lines):
 
     return ping_times, packet_loss
 
-def create_plots(ping_times, duration, plots_folder):
+def create_plots(ping_times, duration, interval, plots_folder):
     ping_times = [min(1000, time) for time in ping_times]
-    df = pd.DataFrame(ping_times, columns=['Ping (ms)'])
+    time_stamps = [i * interval for i in range(len(ping_times))]
+    df = pd.DataFrame({'Time (s)': time_stamps, 'Ping (ms)': ping_times})
     full_hours = duration // 3600
     remaining_time = duration % 3600
 
     if full_hours < 1:
         logging.info("Duration is less than 1 hour, generating a single plot")
         plt.figure(figsize=FIGSIZE)
-        plt.plot(df['Ping (ms)'])
+        plt.plot(df['Time (s)'], df['Ping (ms)'])
         plt.title(f'WiFi Network Ping Over Time (Duration: {duration // 60} minutes, Max Value Capped at 1000 ms)')
         plt.xlabel('Time (seconds)')
         plt.ylabel('Ping (ms)')
@@ -73,7 +75,7 @@ def create_plots(ping_times, duration, plots_folder):
 
         for i, split_df in enumerate(split_dfs):
             plt.figure(figsize=FIGSIZE)
-            plt.plot(split_df['Ping (ms)'])
+            plt.plot(split_df['Time (s)'], split_df['Ping (ms)'])
             plt.title(f'WiFi Network Ping Over Time (Hour {i + 1}, Max Value Capped at 1000 ms)')
             plt.xlabel('Time (seconds)')
             plt.ylabel('Ping (ms)')
@@ -85,7 +87,7 @@ def create_plots(ping_times, duration, plots_folder):
             remaining_samples = len(df) - full_hours * samples_per_hour
             remaining_df = df.iloc[-remaining_samples:]
             plt.figure(figsize=FIGSIZE)
-            plt.plot(remaining_df['Ping (ms)'])
+            plt.plot(remaining_df['Time (s)'], remaining_df['Ping (ms)'])
             plt.title(f'WiFi Network Ping Over Time (Remaining {remaining_time // 60} minutes, Max Value Capped at 1000 ms)')
             plt.xlabel('Time (seconds)')
             plt.ylabel('Ping (ms)')
@@ -96,11 +98,11 @@ def create_plots(ping_times, duration, plots_folder):
 def main():
     initialize_logging()
     args = parse_arguments()
-    logging.info(f"Arguments received: results_file={args.results_file}, plots_folder={args.plots_folder}, duration={args.duration}, ip_address={args.ip_address}")
+    logging.info(f"Arguments received: results_file={args.results_file}, plots_folder={args.plots_folder}, duration={args.duration}, ip_address={args.ip_address}, interval={args.interval}")
 
     lines = read_ping_results(args.results_file)
     ping_times, packet_loss = extract_ping_data(lines)
-    create_plots(ping_times, args.duration, args.plots_folder)
+    create_plots(ping_times, args.duration, args.interval, args.plots_folder)
 
     print(f'Total Packet Loss: {packet_loss}%')
     logging.info("Python script completed")
