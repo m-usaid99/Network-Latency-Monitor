@@ -7,14 +7,15 @@ This project provides a way to monitor the ping of your WiFi network over a spec
 - Bash (to run the shell script)
 - Python 3.x
 - ```matplotlib``` and ```pandas```
+- ```argparse```
 
 You can install the required python libraries using pip:
 
-    pip install matplotlib pandas
+    pip install matplotlib pandas argparse
 
 or 
 
-    pip3 install matplotlib pandas
+    pip3 install matplotlib pandas argparse
 
 ## Usage
 
@@ -22,7 +23,7 @@ or
 
 To monitor the ping of your WiFi network, run the monitor_ping.sh script. The script accepts optional arguments for the duration of the monitoring period and the IP address to ping.
 
-    ./monitor_ping.sh [-t duration_in_seconds] [-i ip_address]
+    ./monitor_ping.sh [-t duration_in_seconds] [-i ip_address] [-f file_to_ping_results.txt]
 
 - ``` -t duration_in_seconds ```: The amount of time to collect data for, in seconds. The default value is 10,800 seconds (3 hours). 
 - ```-i ip_address```: THe IP address to ping; Default: 8.8.8.8.
@@ -71,6 +72,7 @@ The output files are named based on the current date and time to avoid conflicts
 ## Future Work
 
 - Implement option to change ping interval (provide both default and user-defined option).
+- Add extensive error handling.
 - Find ways to optimize script, reduce runtime. 
 - Find a nicer looking charting library.
 - Contributions are welcome.
