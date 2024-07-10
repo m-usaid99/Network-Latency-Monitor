@@ -7,15 +7,16 @@ This project provides a way to monitor the ping of your WiFi network over a spec
 - Bash (to run the shell script)
 - Python 3.x
 - ```matplotlib``` and ```pandas```
+- ```seaborn```
 - ```argparse```
 
 You can install the required python libraries using pip:
 
-    pip install matplotlib pandas argparse
+    pip install matplotlib pandas argparse seaborn
 
 or 
 
-    pip3 install matplotlib pandas argparse
+    pip3 install matplotlib pandas argparse seaborn
 
 ## Usage
 
