@@ -26,7 +26,8 @@ To monitor the ping of your WiFi network, run the monitor_ping.sh script. The sc
     ./monitor_ping.sh [-t duration_in_seconds] [-i ip_address] [-f file_to_ping_results.txt]
 
 - ``` -t duration_in_seconds ```: The amount of time to collect data for, in seconds. The default value is 10,800 seconds (3 hours). 
-- ```-i ip_address```: THe IP address to ping; Default: 8.8.8.8.
+- ```-i ip_address```: The IP address to ping; Default: 8.8.8.8.
+- ```-p ping_interval```: The time interval in seconds after which each ping is sent. 1 second by default. 
 - ```-f file_to_ping_results.txt```: If a user wants to use a previously generated results file, they can specify it. By default, the script will generate a new results file.
 
 Note: The ```-f``` flag will cause the script to ignore any ```-i``` and ```-t``` flags.

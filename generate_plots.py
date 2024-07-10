@@ -4,6 +4,7 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib
+import seaborn as sns
 import logging
 import argparse
 
@@ -12,6 +13,15 @@ matplotlib.use('Agg')
 
 # Global configuration
 FIGSIZE = (30, 25)
+
+plt.rcParams.update({
+    'font.size': 18,       # Default text size
+    'axes.titlesize': 20,  # Title font size
+    'axes.labelsize': 18,  # X and Y label font size
+    'xtick.labelsize': 16, # X tick labels font size
+    'ytick.labelsize': 16, # Y tick labels font size
+    'legend.fontsize': 16, # Legend font size
+})
 
 def initialize_logging():
     current_date = pd.Timestamp.now().strftime('%Y-%m-%d_%H-%M-%S')
@@ -53,6 +63,7 @@ def extract_ping_data(lines):
     return ping_times, packet_loss
 
 def create_plots(ping_times, duration, interval, plots_folder):
+    sns.set(style="darkgrid")  # Set the Seaborn style
     ping_times = [min(1000, time) for time in ping_times]
     time_stamps = [i * interval for i in range(len(ping_times))]
     df = pd.DataFrame({'Time (s)': time_stamps, 'Ping (ms)': ping_times})
@@ -62,7 +73,7 @@ def create_plots(ping_times, duration, interval, plots_folder):
     if full_hours < 1:
         logging.info("Duration is less than 1 hour, generating a single plot")
         plt.figure(figsize=FIGSIZE)
-        plt.plot(df['Time (s)'], df['Ping (ms)'])
+        sns.lineplot(x='Time (s)', y='Ping (ms)', data=df)
         plt.title(f'WiFi Network Ping Over Time (Duration: {duration // 60} minutes, Max Value Capped at 1000 ms)')
         plt.xlabel('Time (seconds)')
         plt.ylabel('Ping (ms)')
@@ -75,7 +86,7 @@ def create_plots(ping_times, duration, interval, plots_folder):
 
         for i, split_df in enumerate(split_dfs):
             plt.figure(figsize=FIGSIZE)
-            plt.plot(split_df['Time (s)'], split_df['Ping (ms)'])
+            sns.lineplot(x='Time (s)', y='Ping (ms)', data=split_df)
             plt.title(f'WiFi Network Ping Over Time (Hour {i + 1}, Max Value Capped at 1000 ms)')
             plt.xlabel('Time (seconds)')
             plt.ylabel('Ping (ms)')
@@ -87,7 +98,7 @@ def create_plots(ping_times, duration, interval, plots_folder):
             remaining_samples = len(df) - full_hours * samples_per_hour
             remaining_df = df.iloc[-remaining_samples:]
             plt.figure(figsize=FIGSIZE)
-            plt.plot(remaining_df['Time (s)'], remaining_df['Ping (ms)'])
+            sns.lineplot(x='Time (s)', y='Ping (ms)', data=remaining_df)
             plt.title(f'WiFi Network Ping Over Time (Remaining {remaining_time // 60} minutes, Max Value Capped at 1000 ms)')
             plt.xlabel('Time (seconds)')
             plt.ylabel('Ping (ms)')
