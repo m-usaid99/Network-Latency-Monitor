@@ -26,6 +26,9 @@ To monitor the ping of your WiFi network, run the monitor_ping.sh script. The sc
 
 - ``` -t duration_in_seconds ```: The amount of time to collect data for, in seconds. The default value is 10,800 seconds (3 hours). 
 - ```-i ip_address```: THe IP address to ping; Default: 8.8.8.8.
+- ```-f file_to_ping_results.txt```: If a user wants to use a previously generated results file, they can specify it. By default, the script will generate a new results file.
+
+Note: The ```-f``` flag will cause the script to ignore any ```-i``` and ```-t``` flags.
 
 
 Make sure to remember to grant the script permission to run in case it doesn't work by:
@@ -56,18 +59,18 @@ The output files are named based on the current date and time to avoid conflicts
     .
     ├── monitor_ping.sh 
     ├── generate_plots.py 
-    ├── results 
+    ├── results/
     │   └── ping_results_2024-07-08_14-23-45.txt
     └── plots/
         └── plots_2024-07-08_14-23-45/
             ├── wifi_ping_plot_hour_1.png
             ├── wifi_ping_plot_hour_2.png
             ├── wifi_ping_plot_hour_3.png
-            └──	wifi_ping_plot_remaining.png	
+            └── wifi_ping_plot_remaining.png	
 
 ## Future Work
 
 - Implement option to change ping interval (provide both default and user-defined option).
 - Find ways to optimize script, reduce runtime. 
-- Find a nicer looking charting library, experiment with seaborn.
+- Find a nicer looking charting library.
 - Contributions are welcome.

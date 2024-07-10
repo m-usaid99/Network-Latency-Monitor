@@ -3,6 +3,10 @@ import sys
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib
+
+# Use the Agg backend for matplotlib to improve performance in non-interactive environments
+matplotlib.use('Agg')
 
 # Get the command-line arguments
 results_file = sys.argv[1]
@@ -41,7 +45,7 @@ remaining_time = duration % 3600
 
 if full_hours < 1:
     # Plot the entire duration as a single plot if less than one hour
-    plt.figure(figsize=(25, 20))  # Increase the width and height of the graph
+    plt.figure(figsize=(25, 25))  # Increase the width and height of the graph
     plt.plot(df['Ping (ms)'])
     plt.title(f'WiFi Network Ping Over Time (Duration: {duration // 60} minutes, Max Value Capped at 1000 ms)')
     plt.xlabel('Time (seconds)')
@@ -69,7 +73,7 @@ else:
     if remaining_time > 0:
         remaining_samples = len(df) - full_hours * samples_per_hour
         remaining_df = df.iloc[-remaining_samples:]
-        plt.figure(figsize=(20, 15))
+        plt.figure(figsize=(25, 15))
         plt.plot(remaining_df['Ping (ms)'])
         plt.title(f'WiFi Network Ping Over Time (Remaining {remaining_time // 60} minutes, Max Value Capped at 1000 ms)')
         plt.xlabel('Time (seconds)')
@@ -79,4 +83,3 @@ else:
 
 # Print packet loss
 print(f'Total Packet Loss: {packet_loss}%')
-    
