@@ -10,6 +10,9 @@ import argparse
 # Use the Agg backend for matplotlib to improve performance in non-interactive environments
 matplotlib.use('Agg')
 
+# GLOBALS
+FIGSIZE = (30, 25)
+
 def initialize_logging():
     current_date = pd.Timestamp.now().strftime('%Y-%m-%d_%H-%M-%S')
     log_file = f'logs/generate_plots_{current_date}.log'
@@ -56,7 +59,7 @@ def create_plots(ping_times, duration, plots_folder):
 
     if full_hours < 1:
         logging.info("Duration is less than 1 hour, generating a single plot")
-        plt.figure(figsize=(20, 15))
+        plt.figure(figsize=FIGSIZE)
         plt.plot(df['Ping (ms)'])
         plt.title(f'WiFi Network Ping Over Time (Duration: {duration // 60} minutes, Max Value Capped at 1000 ms)')
         plt.xlabel('Time (seconds)')
@@ -69,7 +72,7 @@ def create_plots(ping_times, duration, plots_folder):
         split_dfs = [df.iloc[i * samples_per_hour:(i + 1) * samples_per_hour] for i in range(full_hours)]
 
         for i, split_df in enumerate(split_dfs):
-            plt.figure(figsize=(20, 15))
+            plt.figure(figsize=FIGSIZE)
             plt.plot(split_df['Ping (ms)'])
             plt.title(f'WiFi Network Ping Over Time (Hour {i + 1}, Max Value Capped at 1000 ms)')
             plt.xlabel('Time (seconds)')
@@ -81,7 +84,7 @@ def create_plots(ping_times, duration, plots_folder):
         if remaining_time > 0:
             remaining_samples = len(df) - full_hours * samples_per_hour
             remaining_df = df.iloc[-remaining_samples:]
-            plt.figure(figsize=(20, 15))
+            plt.figure(figsize=FIGSIZE)
             plt.plot(remaining_df['Ping (ms)'])
             plt.title(f'WiFi Network Ping Over Time (Remaining {remaining_time // 60} minutes, Max Value Capped at 1000 ms)')
             plt.xlabel('Time (seconds)')
