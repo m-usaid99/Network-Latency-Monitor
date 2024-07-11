@@ -24,7 +24,8 @@ default_config=$(cat <<EOL
 # Default configuration values
 duration: 10800
 ip_address: "8.8.8.8"
-interval: 1
+ping_interval: 1
+aggregation_interval: 60
 
 # Plotting settings
 plot:
@@ -81,7 +82,7 @@ print(config.get('$1', ''))
 # Load configuration values
 duration=$(read_config 'duration')
 ip_address=$(read_config 'ip_address')
-interval=$(read_config 'interval')
+ping_interval=$(read_config 'ping_interval')
 results_folder=$(read_config 'results_folder')
 plots_folder=$(read_config 'plots_folder')
 log_folder=$(read_config 'log_folder')
@@ -97,7 +98,7 @@ while getopts "t:i:f:p:hrcPR" opt; do
     t) duration=$OPTARG ;;
     i) ip_address=$OPTARG ;;
     f) text_file=$OPTARG ;;
-    p) interval=$OPTARG ;;
+    p) ping_interval=$OPTARG ;;
     r) reset_config=true ;;
     c) clear_all=true ;;
     P) clear_plots=true ;;
@@ -187,7 +188,7 @@ if [ -n "$text_file" ]; then
   fi
 fi
 
-log "Parsed arguments: duration=$duration, ip_address=$ip_address, text_file=$text_file, interval=$interval"
+log "Parsed arguments: duration=$duration, ip_address=$ip_address, text_file=$text_file, ping_interval=$ping_interval"
 
 # Define the filename for the ping results
 results_file="$results_folder/ping_results_$current_date.txt"
@@ -221,8 +222,8 @@ if [ -n "$text_file" ]; then
   cp "$text_file" "$results_file"
   log "Copied text file $text_file to $results_file"
 else
-  log "Running ping command: ping -i $interval -w $duration $ip_address"
-  ping -i $interval -w $duration $ip_address > $results_file &
+  log "Running ping command: ping -i $ping_interval -w $duration $ip_address"
+  ping -i $ping_interval -w $duration $ip_address > $results_file &
   ping_pid=$!
 
   # Track progress
@@ -252,5 +253,5 @@ fi
 
 # Run the Python script to generate the plots
 log "Running Python script to generate plots"
-python3 generate_plots.py $results_file $plots_folder $duration $ip_address $interval 2>&1 | tee -a $log_file
+python3 generate_plots.py $results_file $plots_folder $duration $ip_address $ping_interval 2>&1 | tee -a $log_file
 log "Python script completed"
