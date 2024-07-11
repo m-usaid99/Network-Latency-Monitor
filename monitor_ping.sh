@@ -1,39 +1,108 @@
 #!/bin/bash
 
-# Default values
-duration=10800  # 3 hours in seconds
-ip_address="8.8.8.8"
-text_file=""
-interval=1  # Default interval for ping command
-results_file="ping_results.txt"
+# Configuration file
+config_file="config.yaml"
 
-show_help() {
-  echo "Usage: $0 [-t duration_in_seconds] [-i ip_address] [-f file_to_ping_results.txt] [-p ping_interval]"
-  echo
-  echo "Options:"
-  echo "  -t duration_in_seconds  The amount of time to collect data for, in seconds. Default: 10800 seconds (3 hours)"
-  echo "  -i ip_address           The IP address to ping. Default: 8.8.8.8"
-  echo "  -f file_to_ping_results.txt  Path to an existing text file with ping results"
-  echo "  -p ping_interval        The interval between each ping in seconds. Default: 1 second"
-  echo "  -h                      Show this help message and exit"
+# Default configuration values
+default_config=$(cat <<EOL
+# Default configuration values
+duration: 10800
+ip_address: "8.8.8.8"
+interval: 1
+
+# Plotting settings
+plot:
+  figure_size: [30, 25]
+  dpi: 100
+  theme: "darkgrid"
+  font:
+    title_size: 20
+    label_size: 18
+    tick_size: 16
+    legend_size: 16
+
+# Data aggregation settings
+aggregation:
+  method: "mean"  # Options: mean, median, min, max
+  interval: 60    # Aggregation interval in seconds
+
+# Data segmentation settings
+segmentation:
+  hourly: true
+
+# Folder paths
+results_folder: "results"
+plots_folder: "plots"
+log_folder: "logs"
+EOL
+)
+
+# Function to create a default configuration file
+create_default_config() {
+  echo "$default_config" > $config_file
+  echo "Default configuration file created: $config_file"
+}
+
+# Check if configuration file exists
+if [ ! -f $config_file ]; then
+  create_default_config
+fi
+
+# Function to read values from the YAML configuration file using Python
+read_config() {
+  python3 -c "
+import yaml
+import sys
+
+config_file = '$config_file'
+with open(config_file, 'r') as f:
+    config = yaml.safe_load(f)
+
+print(config.get('$1', ''))
+"
 }
 
 # Parse arguments
-while getopts "t:i:f:p:h" opt; do
+while getopts "t:i:f:p:hr" opt; do
   case $opt in
     t) duration=$OPTARG ;;
     i) ip_address=$OPTARG ;;
     f) text_file=$OPTARG ;;
     p) interval=$OPTARG ;;
+    r) reset_config=true ;;
     h) show_help; exit 0 ;;
     \?) show_help; exit 1 ;;
   esac
 done
 
+# Handle reset configuration file option
+if [ "$reset_config" = true ]; then
+  create_default_config
+  echo "Configuration file has been reset to default values."
+  exit 0
+fi
+
+# Load configuration values
+duration=$(read_config 'duration')
+ip_address=$(read_config 'ip_address')
+interval=$(read_config 'interval')
+results_folder=$(read_config 'results_folder')
+plots_folder=$(read_config 'plots_folder')
+log_folder=$(read_config 'log_folder')
+
+# Use default values if variables are empty
+results_folder=${results_folder:-"results"}
+plots_folder=${plots_folder:-"plots/plots_$(date +%Y-%m-%d_%H-%M-%S)"}
+log_folder=${log_folder:-"logs"}
+
+# Create necessary directories
+mkdir -p $results_folder
+mkdir -p $plots_folder
+mkdir -p $log_folder
+
 # Get the current date and time in a more user-friendly format
 current_date=$(date +%Y-%m-%d_%H-%M-%S)
-log_file="logs/monitor_ping_$current_date.log"
-mkdir -p logs
+log_file="$log_folder/monitor_ping_$current_date.log"
 
 # Log function
 log() {
@@ -50,12 +119,6 @@ if [ -n "$text_file" ]; then
 fi
 
 log "Parsed arguments: duration=$duration, ip_address=$ip_address, text_file=$text_file, interval=$interval"
-
-# Create directories for results and plots
-results_folder="results"
-plots_folder="plots/plots_$current_date"
-mkdir -p $results_folder
-mkdir -p $plots_folder
 
 # Define the filename for the ping results
 results_file="$results_folder/ping_results_$current_date.txt"
