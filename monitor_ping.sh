@@ -62,6 +62,19 @@ print(config.get('$1', ''))
 "
 }
 
+# Load configuration values
+duration=$(read_config 'duration')
+ip_address=$(read_config 'ip_address')
+interval=$(read_config 'interval')
+results_folder=$(read_config 'results_folder')
+plots_folder=$(read_config 'plots_folder')
+log_folder=$(read_config 'log_folder')
+
+# Use default values if variables are empty
+results_folder=${results_folder:-"results"}
+plots_folder=${plots_folder:-"plots/plots_$(date +%Y-%m-%d_%H-%M-%S)"}
+log_folder=${log_folder:-"logs"}
+
 # Parse arguments
 while getopts "t:i:f:p:hr" opt; do
   case $opt in
@@ -81,19 +94,6 @@ if [ "$reset_config" = true ]; then
   echo "Configuration file has been reset to default values."
   exit 0
 fi
-
-# Load configuration values
-duration=$(read_config 'duration')
-ip_address=$(read_config 'ip_address')
-interval=$(read_config 'interval')
-results_folder=$(read_config 'results_folder')
-plots_folder=$(read_config 'plots_folder')
-log_folder=$(read_config 'log_folder')
-
-# Use default values if variables are empty
-results_folder=${results_folder:-"results"}
-plots_folder=${plots_folder:-"plots/plots_$(date +%Y-%m-%d_%H-%M-%S)"}
-log_folder=${log_folder:-"logs"}
 
 # Create necessary directories
 mkdir -p $results_folder

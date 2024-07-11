@@ -7,20 +7,21 @@ import matplotlib
 import seaborn as sns
 import logging
 import argparse
+import statistics
 
 # Use the Agg backend for matplotlib to improve performance in non-interactive environments
 matplotlib.use('Agg')
 
 # Global configuration
-FIGSIZE = (30, 25)
+FIGSIZE = (20, 15)  # Smaller figure size for better text readability
 
 plt.rcParams.update({
-    'font.size': 18,       # Default text size
-    'axes.titlesize': 20,  # Title font size
-    'axes.labelsize': 18,  # X and Y label font size
-    'xtick.labelsize': 16, # X tick labels font size
-    'ytick.labelsize': 16, # Y tick labels font size
-    'legend.fontsize': 16, # Legend font size
+    'font.size': 22,       # Default text size
+    'axes.titlesize': 24,  # Title font size
+    'axes.labelsize': 22,  # X and Y label font size
+    'xtick.labelsize': 20, # X tick labels font size
+    'ytick.labelsize': 20, # Y tick labels font size
+    'legend.fontsize': 20, # Legend font size
 })
 
 def initialize_logging():
@@ -36,6 +37,7 @@ def parse_arguments():
     parser.add_argument("duration", type=int, help="Duration of the ping monitoring in seconds")
     parser.add_argument("ip_address", help="IP address to ping")
     parser.add_argument("interval", type=int, help="Interval between pings in seconds")
+    parser.add_argument("--aggregation_method", choices=['mean', 'min', 'max'], default='mean', help="Method for aggregating data")
     return parser.parse_args()
 
 def read_ping_results(file_path):
@@ -62,22 +64,39 @@ def extract_ping_data(lines):
 
     return ping_times, packet_loss
 
-def create_plots(ping_times, duration, interval, plots_folder):
+def aggregate_data(ping_times, interval, method='mean'):
+    aggregated_data = []
+    for i in range(0, len(ping_times), interval):
+        chunk = ping_times[i:i+interval]
+        if method == 'mean':
+            aggregated_data.append(sum(chunk) / len(chunk))
+        elif method == 'min':
+            aggregated_data.append(min(chunk))
+        elif method == 'max':
+            aggregated_data.append(max(chunk))
+    return aggregated_data
+
+def create_plots(ping_times, duration, interval, plots_folder, aggregation_method):
     sns.set(style="darkgrid")  # Set the Seaborn style
-    ping_times = [min(1000, time) for time in ping_times]
-    time_stamps = [i * interval for i in range(len(ping_times))]
-    df = pd.DataFrame({'Time (s)': time_stamps, 'Ping (ms)': ping_times})
+    aggregated_data = aggregate_data(ping_times, interval, method=aggregation_method)
+    time_stamps = [i * interval for i in range(len(aggregated_data))]
+    df = pd.DataFrame({'Time (s)': time_stamps, 'Ping (ms)': aggregated_data})
     full_hours = duration // 3600
     remaining_time = duration % 3600
+
+    # Create subdirectory for plots
+    current_date = pd.Timestamp.now().strftime('%Y-%m-%d_%H-%M-%S')
+    plot_subfolder = os.path.join(plots_folder, f'plots_{current_date}')
+    os.makedirs(plot_subfolder, exist_ok=True)
 
     if full_hours < 1:
         logging.info("Duration is less than 1 hour, generating a single plot")
         plt.figure(figsize=FIGSIZE)
         sns.lineplot(x='Time (s)', y='Ping (ms)', data=df)
-        plt.title(f'WiFi Network Ping Over Time (Duration: {duration // 60} minutes, Max Value Capped at 1000 ms)')
+        plt.title(f'WiFi Network Ping Over Time (Duration: {duration // 60} minutes, Method: {aggregation_method})')
         plt.xlabel('Time (seconds)')
         plt.ylabel('Ping (ms)')
-        plt.savefig(os.path.join(plots_folder, 'wifi_ping_plot.png'))
+        plt.savefig(os.path.join(plot_subfolder, 'wifi_ping_plot.png'))
         plt.close()
         logging.info("Generated plot for the entire duration")
     else:
@@ -87,10 +106,10 @@ def create_plots(ping_times, duration, interval, plots_folder):
         for i, split_df in enumerate(split_dfs):
             plt.figure(figsize=FIGSIZE)
             sns.lineplot(x='Time (s)', y='Ping (ms)', data=split_df)
-            plt.title(f'WiFi Network Ping Over Time (Hour {i + 1}, Max Value Capped at 1000 ms)')
+            plt.title(f'WiFi Network Ping Over Time (Hour {i + 1}, Method: {aggregation_method})')
             plt.xlabel('Time (seconds)')
             plt.ylabel('Ping (ms)')
-            plt.savefig(os.path.join(plots_folder, f'wifi_ping_plot_hour_{i + 1}.png'))
+            plt.savefig(os.path.join(plot_subfolder, f'wifi_ping_plot_hour_{i + 1}.png'))
             plt.close()
             logging.info(f"Generated plot for hour {i + 1}")
 
@@ -99,21 +118,21 @@ def create_plots(ping_times, duration, interval, plots_folder):
             remaining_df = df.iloc[-remaining_samples:]
             plt.figure(figsize=FIGSIZE)
             sns.lineplot(x='Time (s)', y='Ping (ms)', data=remaining_df)
-            plt.title(f'WiFi Network Ping Over Time (Remaining {remaining_time // 60} minutes, Max Value Capped at 1000 ms)')
+            plt.title(f'WiFi Network Ping Over Time (Remaining {remaining_time // 60} minutes, Method: {aggregation_method})')
             plt.xlabel('Time (seconds)')
             plt.ylabel('Ping (ms)')
-            plt.savefig(os.path.join(plots_folder, 'wifi_ping_plot_remaining.png'))
+            plt.savefig(os.path.join(plot_subfolder, 'wifi_ping_plot_remaining.png'))
             plt.close()
             logging.info(f"Generated plot for remaining {remaining_time // 60} minutes")
 
 def main():
     initialize_logging()
     args = parse_arguments()
-    logging.info(f"Arguments received: results_file={args.results_file}, plots_folder={args.plots_folder}, duration={args.duration}, ip_address={args.ip_address}, interval={args.interval}")
+    logging.info(f"Arguments received: results_file={args.results_file}, plots_folder={args.plots_folder}, duration={args.duration}, ip_address={args.ip_address}, interval={args.interval}, aggregation_method={args.aggregation_method}")
 
     lines = read_ping_results(args.results_file)
     ping_times, packet_loss = extract_ping_data(lines)
-    create_plots(ping_times, args.duration, args.interval, args.plots_folder)
+    create_plots(ping_times, args.duration, args.interval, args.plots_folder, args.aggregation_method)
 
     print(f'Total Packet Loss: {packet_loss}%')
     logging.info("Python script completed")
