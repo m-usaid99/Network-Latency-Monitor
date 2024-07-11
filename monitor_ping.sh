@@ -1,5 +1,21 @@
 #!/bin/bash
 
+# Function to show help message
+show_help() {
+  echo "Usage: $0 [-t duration_in_seconds] [-i ip_address] [-f file_to_ping_results.txt] [-p ping_interval] [-r] [-c] [-P] [-R]"
+  echo
+  echo "Options:"
+  echo "  -t duration_in_seconds  The amount of time to collect data for, in seconds. Default: 10800 seconds (3 hours)"
+  echo "  -i ip_address           The IP address to ping. Default: 8.8.8.8"
+  echo "  -f file_to_ping_results.txt  Path to an existing text file with ping results"
+  echo "  -p ping_interval        The interval between each ping in seconds. Default: 1 second"
+  echo "  -r                      Reset the configuration file to default values"
+  echo "  -c                      Clear all results and plots (with confirmation)"
+  echo "  -P                      Clear all plots (with confirmation)"
+  echo "  -R                      Clear all results (with confirmation)"
+  echo "  -h                      Show this help message and exit"
+}
+
 # Configuration file
 config_file="config.yaml"
 
@@ -12,14 +28,14 @@ interval: 1
 
 # Plotting settings
 plot:
-  figure_size: [30, 25]
+  figure_size: [20, 15]
   dpi: 100
   theme: "darkgrid"
   font:
-    title_size: 20
-    label_size: 18
-    tick_size: 16
-    legend_size: 16
+    title_size: 24
+    label_size: 22
+    tick_size: 20
+    legend_size: 20
 
 # Data aggregation settings
 aggregation:
@@ -72,17 +88,20 @@ log_folder=$(read_config 'log_folder')
 
 # Use default values if variables are empty
 results_folder=${results_folder:-"results"}
-plots_folder=${plots_folder:-"plots/plots_$(date +%Y-%m-%d_%H-%M-%S)"}
+plots_folder=${plots_folder:-"plots"}
 log_folder=${log_folder:-"logs"}
 
 # Parse arguments
-while getopts "t:i:f:p:hr" opt; do
+while getopts "t:i:f:p:hrcPR" opt; do
   case $opt in
     t) duration=$OPTARG ;;
     i) ip_address=$OPTARG ;;
     f) text_file=$OPTARG ;;
     p) interval=$OPTARG ;;
     r) reset_config=true ;;
+    c) clear_all=true ;;
+    P) clear_plots=true ;;
+    R) clear_results=true ;;
     h) show_help; exit 0 ;;
     \?) show_help; exit 1 ;;
   esac
@@ -92,6 +111,56 @@ done
 if [ "$reset_config" = true ]; then
   create_default_config
   echo "Configuration file has been reset to default values."
+  exit 0
+fi
+
+# Function to confirm action
+confirm() {
+  read -p "Are you sure you want to $1? (y/n): " choice
+  case "$choice" in
+    y|Y ) return 0 ;;
+    * ) return 1 ;;
+  esac
+}
+
+# Function to clear results
+clear_results() {
+  rm -rf "$results_folder"/*
+  echo "All results have been cleared."
+}
+
+# Function to clear plots
+clear_plots() {
+  rm -rf "$plots_folder"/*
+  echo "All plots have been cleared."
+}
+
+# Handle clear options with confirmation
+if [ "$clear_all" = true ]; then
+  if confirm "clear all results and plots"; then
+    clear_results
+    clear_plots
+  else
+    echo "Operation cancelled."
+  fi
+  exit 0
+fi
+
+if [ "$clear_results" = true ]; then
+  if confirm "clear all results"; then
+    clear_results
+  else
+    echo "Operation cancelled."
+  fi
+  exit 0
+fi
+
+if [ "$clear_plots" = true ]; then
+  if confirm "clear all plots"; then
+    clear_plots
+  else
+    echo "Operation cancelled."
+  fi
   exit 0
 fi
 
