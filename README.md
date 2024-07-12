@@ -134,8 +134,11 @@ To reset the configuration file to default values, use the `-r` option:
 
 ## Future Work
 
-- Implement option to change ping interval (provide both default and user-defined option).
-- Add extensive error handling.
-- Find ways to optimize script, reduce runtime. 
-- Find a nicer looking charting library.
+- Implement support for pinging multiple addresses concurrently, with options to plot data on the same graph and separate graphs.
+- Further optimize the script to reduce runtime.
+- Enhance data visualization with more advanced charts and interactive features.
+- Continue improving error handling and logging for even better robustness.
+- Explore additional customization options for advanced users through the configuration file.
+- Add support for different output formats, such as JSON or CSV, for the results data.
+- Add automated testing to ensure script reliability and performance.
 - Contributions are welcome.
