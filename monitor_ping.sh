@@ -26,7 +26,8 @@ show_help() {
 config_file="config.yaml"
 
 # Default configuration values
-default_config=$(cat <<EOL
+default_config=$(
+  cat <<EOL
 # Default configuration values
 
 # Duration for the ping monitoring in seconds
@@ -109,7 +110,7 @@ EOL
 
 # Function to create a default configuration file
 create_default_config() {
-  echo "$default_config" > $config_file
+  echo "$default_config" >$config_file
   echo "Default configuration file created: $config_file"
 }
 
@@ -158,29 +159,43 @@ no_aggregation=false
 # Parse arguments
 while getopts "t:i:f:p:hrc:P:R:L-:" opt; do
   case $opt in
-    t) duration=$OPTARG ;;
-    i) ip_address=$OPTARG ;;
-    f) text_file=$OPTARG ;;
-    p) ping_interval=$OPTARG ;;
-    r) reset_config=true ;;
-    c)
-      case "$OPTARG" in
-        all) clear_all=true ;;
-        results) clear_results=true ;;
-        plots) clear_plots=true ;;
-        logs) clear_logs=true ;;
-        *) show_help; exit 1 ;;
-      esac ;;
-    P) clear_plots=true ;;
-    R) clear_results=true ;;
-    L) clear_logs=true ;;
-    -)
-      case "${OPTARG}" in
-        no-aggregation) no_aggregation=true ;;
-        *) show_help; exit 1 ;;
-      esac ;;
-    h) show_help; exit 0 ;;
-    \?) show_help; exit 1 ;;
+  t) duration=$OPTARG ;;
+  i) ip_address=$OPTARG ;;
+  f) text_file=$OPTARG ;;
+  p) ping_interval=$OPTARG ;;
+  r) reset_config=true ;;
+  c)
+    case "$OPTARG" in
+    all) clear_all=true ;;
+    results) clear_results=true ;;
+    plots) clear_plots=true ;;
+    logs) clear_logs=true ;;
+    *)
+      show_help
+      exit 1
+      ;;
+    esac
+    ;;
+  P) clear_plots=true ;;
+  R) clear_results=true ;;
+  L) clear_logs=true ;;
+  -)
+    case "${OPTARG}" in
+    no-aggregation) no_aggregation=true ;;
+    *)
+      show_help
+      exit 1
+      ;;
+    esac
+    ;;
+  h)
+    show_help
+    exit 0
+    ;;
+  \?)
+    show_help
+    exit 1
+    ;;
   esac
 done
 
@@ -195,8 +210,8 @@ fi
 confirm() {
   read -p "Are you sure you want to $1? (y/n): " choice
   case "$choice" in
-    y|Y ) return 0 ;;
-    * ) return 1 ;;
+  y | Y) return 0 ;;
+  *) return 1 ;;
   esac
 }
 
@@ -280,8 +295,6 @@ if [ -n "$text_file" ]; then
   fi
 fi
 
-log "Parsed arguments: duration=$duration, ip_address=$ip_address, text_file=$text_file, ping_interval=$ping_interval, no_aggregation=$no_aggregation"
-
 # Define the filename for the ping results
 results_file="$results_folder/ping_results_$current_date.txt"
 
@@ -299,10 +312,10 @@ draw_progress_bar() {
 
   # Create progress bar with color
   local bar=""
-  for ((i=0; i<complete_width; i++)); do
+  for ((i = 0; i < complete_width; i++)); do
     bar="${bar}${green} ${reset}"
   done
-  for ((i=0; i<incomplete_width; i++)); do
+  for ((i = 0; i < incomplete_width; i++)); do
     bar="${bar}${red} ${reset}"
   done
 
@@ -319,12 +332,12 @@ if [ -n "$text_file" ]; then
   log "Copied text file $text_file to $results_file"
 else
   log "Running ping command: ping -i $ping_interval -w $duration $ip_address"
-  ping -i $ping_interval -w $duration $ip_address > $results_file &
+  ping -i $ping_interval -w $duration $ip_address >$results_file &
   ping_pid=$!
 
   # Track progress
   start_time=$(date +%s)
-  while kill -0 $ping_pid 2> /dev/null; do
+  while kill -0 $ping_pid 2>/dev/null; do
     current_time=$(date +%s)
     elapsed_time=$((current_time - start_time))
     progress=$((elapsed_time * 100 / duration))
@@ -350,13 +363,18 @@ else
     log "Error: Failed to extract packet loss information."
     exit 1
   fi
-  echo "Packet Loss: $packet_loss%" >> $results_file
+  echo "Packet Loss: $packet_loss%" >>$results_file
   log "Packet loss information appended to results file"
+fi
+
+# Determine if no aggregation should be forced based on duration
+if [ "$duration" -lt 60 ]; then
+  no_aggregation=true
 fi
 
 # Run the Python script to generate the plots
 log "Running Python script to generate plots"
-if ! python3 generate_plots.py "$results_file" "$plots_folder" $( [ "$no_aggregation" = true ] && echo "--no-aggregation" ) 2>&1 | tee -a $log_file; then
+if ! python3 generate_plots.py "$results_file" "$plots_folder" $([ "$no_aggregation" = true ] && echo "--no-aggregation") 2>&1 | tee -a $log_file; then
   log "Error: Python script failed to generate plots."
   exit 1
 fi

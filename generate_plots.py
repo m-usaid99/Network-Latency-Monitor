@@ -115,14 +115,16 @@ def create_plots(ping_times, duration, interval, plots_folder, aggregation_metho
         # Cap the max value at 800 ms
         ping_times = [min(800, time) for time in ping_times]
         
-        # Skip aggregation if duration is less than 60 seconds
-        if not no_aggregation and duration >= 60:
+        aggregated_data = []
+        if not no_aggregation:
             aggregated_data = aggregate_data(ping_times, aggregation_interval, method=aggregation_method)
-            agg_time_stamps = [(i * aggregation_interval) + (aggregation_interval / 2) for i in range(len(aggregated_data))]
-            df_agg = pd.DataFrame({'Time (s)': agg_time_stamps, 'Ping (ms)': aggregated_data})
-
+        
         time_stamps = [i * interval for i in range(len(ping_times))]
         df_raw = pd.DataFrame({'Time (s)': time_stamps, 'Ping (ms)': ping_times})
+
+        if aggregated_data:
+            agg_time_stamps = [(i * aggregation_interval) + (aggregation_interval / 2) for i in range(len(aggregated_data))]
+            df_agg = pd.DataFrame({'Time (s)': agg_time_stamps, 'Ping (ms)': aggregated_data})
 
         current_date = pd.Timestamp.now().strftime('%Y-%m-%d_%H-%M-%S')
         plot_subfolder = os.path.join(plots_folder, f'plots_{current_date}')
@@ -130,7 +132,7 @@ def create_plots(ping_times, duration, interval, plots_folder, aggregation_metho
 
         plt.figure(figsize=FIGSIZE)
         sns.lineplot(x='Time (s)', y='Ping (ms)', data=df_raw, label='Raw Data')
-        if not no_aggregation and duration >= 60:
+        if aggregated_data:
             sns.lineplot(x='Time (s)', y='Ping (ms)', data=df_agg, label=f'Aggregated Data ({aggregation_method})', linestyle='dotted', marker='o', linewidth=2.5)
         plt.title(f'WiFi Network Ping Over Time (Max Value Capped at 800 ms)')
         plt.xlabel('Time (seconds)')
