@@ -112,69 +112,34 @@ def aggregate_data(ping_times, interval, method='mean'):
 def create_plots(ping_times, duration, interval, plots_folder, aggregation_method, aggregation_interval, no_aggregation):
     sns.set(style="darkgrid")
     try:
-        if not no_aggregation:
+        # Cap the max value at 800 ms
+        ping_times = [min(800, time) for time in ping_times]
+        
+        # Skip aggregation if duration is less than 60 seconds
+        if not no_aggregation and duration >= 60:
             aggregated_data = aggregate_data(ping_times, aggregation_interval, method=aggregation_method)
             agg_time_stamps = [(i * aggregation_interval) + (aggregation_interval / 2) for i in range(len(aggregated_data))]
             df_agg = pd.DataFrame({'Time (s)': agg_time_stamps, 'Ping (ms)': aggregated_data})
 
-        time_stamps = [i for i in range(len(ping_times))]
+        time_stamps = [i * interval for i in range(len(ping_times))]
         df_raw = pd.DataFrame({'Time (s)': time_stamps, 'Ping (ms)': ping_times})
-
-        full_hours = duration // 3600
-        remaining_time = duration % 3600
 
         current_date = pd.Timestamp.now().strftime('%Y-%m-%d_%H-%M-%S')
         plot_subfolder = os.path.join(plots_folder, f'plots_{current_date}')
         os.makedirs(plot_subfolder, exist_ok=True)
 
-        if full_hours < 1:
-            logging.info("Duration is less than 1 hour, generating a single plot")
-            plt.figure(figsize=FIGSIZE)
-            sns.lineplot(x='Time (s)', y='Ping (ms)', data=df_raw, label='Raw Data')
-            if not no_aggregation:
-                sns.lineplot(x='Time (s)', y='Ping (ms)', data=df_agg, label=f'Aggregated Data ({aggregation_method})', linestyle='dotted', marker='o', linewidth=2.5)
-            plt.title(f'WiFi Network Ping Over Time (Duration: {duration // 60} minutes, Method: {aggregation_method})')
-            plt.xlabel('Time (seconds)')
-            plt.ylabel('Ping (ms)')
-            plt.legend()
-            plt.savefig(os.path.join(plot_subfolder, 'wifi_ping_plot.png'))
-            plt.close()
-            logging.info("Generated plot for the entire duration")
-        else:
-            samples_per_hour = len(df_raw) // full_hours
-            split_dfs_raw = [df_raw.iloc[i * samples_per_hour:(i + 1) * samples_per_hour] for i in range(full_hours)]
-            if not no_aggregation:
-                split_dfs_agg = [df_agg.iloc[i * samples_per_hour:(i + 1) * samples_per_hour] for i in range(full_hours)]
-
-            for i, split_df_raw in enumerate(split_dfs_raw):
-                plt.figure(figsize=FIGSIZE)
-                sns.lineplot(x='Time (s)', y='Ping (ms)', data=split_df_raw, label='Raw Data')
-                if not no_aggregation:
-                    sns.lineplot(x='Time (s)', y='Ping (ms)', data=split_dfs_agg[i], label=f'Aggregated Data ({aggregation_method})', linestyle='dotted', marker='o', linewidth=2.5)
-                plt.title(f'WiFi Network Ping Over Time (Hour {i + 1}, Method: {aggregation_method})')
-                plt.xlabel('Time (seconds)')
-                plt.ylabel('Ping (ms)')
-                plt.legend()
-                plt.savefig(os.path.join(plot_subfolder, f'wifi_ping_plot_hour_{i + 1}.png'))
-                plt.close()
-                logging.info(f"Generated plot for hour {i + 1}")
-
-            if remaining_time > 0:
-                remaining_samples = len(df_raw) - full_hours * samples_per_hour
-                remaining_df_raw = df_raw.iloc[-remaining_samples:]
-                if not no_aggregation:
-                    remaining_df_agg = df_agg.iloc[-remaining_samples:]
-                plt.figure(figsize=FIGSIZE)
-                sns.lineplot(x='Time (s)', y='Ping (ms)', data=remaining_df_raw, label='Raw Data')
-                if not no_aggregation:
-                    sns.lineplot(x='Time (s)', y='Ping (ms)', data=remaining_df_agg, label=f'Aggregated Data ({aggregation_method})', linestyle='dotted', marker='o', linewidth=2.5)
-                plt.title(f'WiFi Network Ping Over Time (Remaining {remaining_time // 60} minutes, Method: {aggregation_method})')
-                plt.xlabel('Time (seconds)')
-                plt.ylabel('Ping (ms)')
-                plt.legend()
-                plt.savefig(os.path.join(plot_subfolder, 'wifi_ping_plot_remaining.png'))
-                plt.close()
-                logging.info(f"Generated plot for remaining {remaining_time // 60} minutes")
+        plt.figure(figsize=FIGSIZE)
+        sns.lineplot(x='Time (s)', y='Ping (ms)', data=df_raw, label='Raw Data')
+        if not no_aggregation and duration >= 60:
+            sns.lineplot(x='Time (s)', y='Ping (ms)', data=df_agg, label=f'Aggregated Data ({aggregation_method})', linestyle='dotted', marker='o', linewidth=2.5)
+        plt.title(f'WiFi Network Ping Over Time (Max Value Capped at 800 ms)')
+        plt.xlabel('Time (seconds)')
+        plt.ylabel('Ping (ms)')
+        plt.legend()
+        plt.xticks(range(0, time_stamps[-1] + interval, max(1, (time_stamps[-1] + interval) // 10)))  # Adjust x-axis labels
+        plt.savefig(os.path.join(plot_subfolder, 'wifi_ping_plot.png'))
+        plt.close()
+        logging.info("Generated plot for the entire duration")
     except Exception as e:
         logging.error(f"Error generating plots: {e}")
         sys.exit(1)
