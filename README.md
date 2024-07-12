@@ -26,7 +26,6 @@ or
 
 To monitor the ping of your WiFi network, run the monitor_ping.sh script. The script accepts optional arguments for the duration of the monitoring period and the IP address to ping.
 
-
     ./monitor_ping.sh [-t duration_in_seconds] [-i ip_address] [-f file_to_ping_results.txt] [-p ping_interval] [--no-aggregation]
 
 - ``` -t duration_in_seconds ```: The amount of time to collect data for, in seconds. The default value is 10,800 seconds (3 hours). 
@@ -52,11 +51,32 @@ Make sure to remember to grant the script permission to run in case it doesn't w
 
     chmod +x monitor_ping.sh
 
-### Example
+### Example Usages
 
+#### Default
+To run the default script (3 hours with 1 second intervals, 8.8.8.8, with aggregation):
+    
+    ./monitor_ping.sh 
+
+#### Custom Duration and IP Address
 To run the script for one hour, and to ping the IP address 1.1.1.1:
 
     ./monitor_ping.sh -t 3600 -i 1.1.1.1
+
+#### Custom Ping Interval
+This command sets the interval between pings to 2 seconds.
+
+    ./monitor_ping.sh -p 2
+
+#### Using an Existing Text File with Ping Results
+This command uses an existing text file with ping results instead of running the ping command.
+
+    ./monitor_ping.sh -f existing_ping_results.txt
+
+#### Disable Aggregation
+This command runs the script without aggregating data.
+
+    ./monitor_ping.sh --no-aggregation
 
 ### Output
 
@@ -72,27 +92,29 @@ The output files are named based on the current date and time to avoid conflicts
 - ```config.yaml```: Generated after first run. 
 - ```results/```: Directory containing the ping results text files.
 - ```plots/```: Directory containing the plots.
-- `logs/`: Directory containing log files.
+- ```logs/```: Directory containing log files.
 
 ### Example File Structure
-    .
-    ├── monitor_ping.sh 
-    ├── generate_plots.py 
-    ├── config.yaml
-    ├── results/
-    │   └── ping_results_2024-07-08_14-23-45.txt
-    ├── plots/
-    │    └── plots_2024-07-08_14-23-45/
-    │        ├── wifi_ping_plot_hour_1.png
-    │        ├── wifi_ping_plot_hour_2.png
-    │        ├── wifi_ping_plot_hour_3.png
-    │        └── wifi_ping_plot_remaining.png	
-    └── logs/
-        └── monitor_ping_2024-07-08_14-23-45.log
+```
+.
+├── monitor_ping.sh 
+├── generate_plots.py 
+├── config.yaml
+├── results/
+│   └── ping_results_2024-07-08_14-23-45.txt
+├── plots/
+│    └── plots_2024-07-08_14-23-45/
+│        ├── wifi_ping_plot_hour_1.png
+│        ├── wifi_ping_plot_hour_2.png
+│        ├── wifi_ping_plot_hour_3.png
+│        └── wifi_ping_plot_remaining.png	
+└── logs/
+    └── monitor_ping_2024-07-08_14-23-45.log
+```
 
 ## Configuration File
 
-The script uses a configuration file (`config.yaml`) to manage default settings. If the configuration file does not exist, it will be created with default values.
+The script uses a configuration file (```config.yaml```) to manage default settings. If the configuration file does not exist, it will be created with default values.
 
 ### Example Configuration File
 

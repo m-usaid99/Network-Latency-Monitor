@@ -372,6 +372,12 @@ if [ "$duration" -lt 60 ]; then
   no_aggregation=true
 fi
 
+# Check if results file is empty
+if [ ! -s "$results_file" ]; then
+  log "Error: Results file is empty or not found."
+  exit 1
+fi
+
 # Run the Python script to generate the plots
 log "Running Python script to generate plots"
 if ! python3 generate_plots.py "$results_file" "$plots_folder" $([ "$no_aggregation" = true ] && echo "--no-aggregation") 2>&1 | tee -a $log_file; then

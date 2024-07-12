@@ -55,6 +55,9 @@ def read_ping_results(file_path):
     try:
         with open(file_path, 'r') as file:
             lines = file.readlines()
+        if not lines:
+            logging.error("Error: Results file is empty.")
+            sys.exit(1)
         return lines
     except FileNotFoundError:
         logging.error(f"Results file {file_path} not found.")
