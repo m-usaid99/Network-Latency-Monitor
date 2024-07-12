@@ -68,6 +68,7 @@ create_default_config() {
 
 # Check if configuration file exists
 if [ ! -f $config_file ]; then
+  echo "Configuration file not found. Creating a default configuration file."
   create_default_config
 fi
 
@@ -78,10 +79,16 @@ import yaml
 import sys
 
 config_file = '$config_file'
-with open(config_file, 'r') as f:
-    config = yaml.safe_load(f)
-
-print(config.get('$1', ''))
+try:
+    with open(config_file, 'r') as f:
+        config = yaml.safe_load(f)
+        print(config.get('$1', ''))
+except FileNotFoundError:
+    print(f'Error: Configuration file {config_file} not found.', file=sys.stderr)
+    sys.exit(1)
+except yaml.YAMLError as e:
+    print(f'Error parsing configuration file: {e}', file=sys.stderr)
+    sys.exit(1)
 "
 }
 
@@ -97,6 +104,9 @@ log_folder=$(read_config 'log_folder')
 results_folder=${results_folder:-"results"}
 plots_folder=${plots_folder:-"plots"}
 log_folder=${log_folder:-"logs"}
+
+# Initialize variables
+no_aggregation=false
 
 # Parse arguments
 while getopts "t:i:f:p:hrc:P:R:L-:" opt; do
@@ -126,6 +136,7 @@ while getopts "t:i:f:p:hrc:P:R:L-:" opt; do
     \?) show_help; exit 1 ;;
   esac
 done
+
 # Handle reset configuration file option
 if [ "$reset_config" = true ]; then
   create_default_config
@@ -154,6 +165,7 @@ clear_plots() {
   echo "All plots have been cleared."
 }
 
+# Function to clear logs
 clear_logs() {
   rm -rf "$log_folder"/*
   echo "All logs have been cleared."
@@ -161,7 +173,7 @@ clear_logs() {
 
 # Handle clear options with confirmation
 if [ "$clear_all" = true ]; then
-  if confirm "clear all results and plots"; then
+  if confirm "clear all results, plots, and logs"; then
     clear_results
     clear_plots
     clear_logs
@@ -198,7 +210,6 @@ if [ "$clear_logs" = true ]; then
   exit 0
 fi
 
-
 # Create necessary directories
 mkdir -p $results_folder
 mkdir -p $plots_folder
@@ -222,7 +233,7 @@ if [ -n "$text_file" ]; then
   fi
 fi
 
-log "Parsed arguments: duration=$duration, ip_address=$ip_address, text_file=$text_file, ping_interval=$ping_interval"
+log "Parsed arguments: duration=$duration, ip_address=$ip_address, text_file=$text_file, ping_interval=$ping_interval, no_aggregation=$no_aggregation"
 
 # Define the filename for the ping results
 results_file="$results_folder/ping_results_$current_date.txt"
@@ -253,11 +264,18 @@ draw_progress_bar() {
 
 # If a text file is provided, use it, otherwise run the ping command
 if [ -n "$text_file" ]; then
+  if [ ! -f "$text_file" ]; then
+    log "Error: Text file $text_file not found."
+    exit 1
+  fi
   cp "$text_file" "$results_file"
   log "Copied text file $text_file to $results_file"
 else
   log "Running ping command: ping -i $ping_interval -w $duration $ip_address"
-  ping -i $ping_interval -w $duration $ip_address > $results_file &
+  if ! ping -i $ping_interval -w $duration $ip_address > $results_file 2>&1; then
+    log "Error: Failed to run ping command. Check your network connection or IP address."
+    exit 1
+  fi
   ping_pid=$!
 
   # Track progress
@@ -276,16 +294,26 @@ else
   echo
 
   # Wait for ping to complete
-  wait $ping_pid
+  if ! wait $ping_pid; then
+    log "Error: Ping command did not complete successfully."
+    exit 1
+  fi
   echo -e "\nPing command completed."
 
   # Extract packet loss information and append to results file
   packet_loss=$(grep -oP '\d+(?=% packet loss)' $results_file | tail -1)
+  if [ -z "$packet_loss" ]; then
+    log "Error: Failed to extract packet loss information."
+    exit 1
+  fi
   echo "Packet Loss: $packet_loss%" >> $results_file
   log "Packet loss information appended to results file"
 fi
 
 # Run the Python script to generate the plots
 log "Running Python script to generate plots"
-python3 generate_plots.py $results_file $plots_folder $duration $ip_address $ping_interval 2>&1 | tee -a $log_file
+if ! python3 generate_plots.py $results_file $plots_folder $duration $ip_address $ping_interval $no_aggregation 2>&1 | tee -a $log_file; then
+  log "Error: Python script failed to generate plots."
+  exit 1
+fi
 log "Python script completed"

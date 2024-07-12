@@ -13,8 +13,8 @@ import argparse
 matplotlib.use('Agg')
 
 # Global configuration
-FIGSIZE = (20, 15)  # Default figure size
-AGGREGATION_INTERVAL = 60  # Default aggregation interval
+FIGSIZE = (20, 15)
+AGGREGATION_INTERVAL = 60
 
 plt.rcParams.update({
     'font.size': 22,       # Default text size
@@ -39,31 +39,49 @@ def parse_arguments():
     return parser.parse_args()
 
 def read_config(config_file='config.yaml'):
-    with open(config_file, 'r') as file:
-        config = yaml.safe_load(file)
-    return config
+    try:
+        with open(config_file, 'r') as file:
+            config = yaml.safe_load(file)
+        return config
+    except FileNotFoundError:
+        logging.error(f"Configuration file {config_file} not found.")
+        sys.exit(1)
+    except yaml.YAMLError as e:
+        logging.error(f"Error parsing configuration file: {e}")
+        sys.exit(1)
 
 def read_ping_results(file_path):
     logging.info(f"Reading ping results from {file_path}")
-    with open(file_path, 'r') as file:
-        lines = file.readlines()
-    return lines
+    try:
+        with open(file_path, 'r') as file:
+            lines = file.readlines()
+        return lines
+    except FileNotFoundError:
+        logging.error(f"Results file {file_path} not found.")
+        sys.exit(1)
+    except Exception as e:
+        logging.error(f"Error reading results file: {e}")
+        sys.exit(1)
 
 def extract_ping_data(lines):
     ping_times = []
     packet_loss = 0
 
-    for line in lines:
-        match = re.search(r'time=(\d+\.?\d*) ms', line)
-        if match:
-            ping_times.append(float(match.group(1)))
+    try:
+        for line in lines:
+            match = re.search(r'time=(\d+\.?\d*) ms', line)
+            if match:
+                ping_times.append(float(match.group(1)))
 
-        loss_match = re.search(r'(\d+)% packet loss', line)
-        if loss_match:
-            packet_loss = int(loss_match.group(1))
-    
-    logging.info(f"Extracted {len(ping_times)} ping times from the results file")
-    logging.info(f"Packet loss: {packet_loss}%")
+            loss_match = re.search(r'(\d+)% packet loss', line)
+            if loss_match:
+                packet_loss = int(loss_match.group(1))
+
+        logging.info(f"Extracted {len(ping_times)} ping times from the results file")
+        logging.info(f"Packet loss: {packet_loss}%")
+    except Exception as e:
+        logging.error(f"Error processing data: {e}")
+        sys.exit(1)
 
     return ping_times, packet_loss
 
@@ -93,69 +111,73 @@ def aggregate_data(ping_times, interval, method='mean'):
 
 def create_plots(ping_times, duration, interval, plots_folder, aggregation_method, aggregation_interval, no_aggregation):
     sns.set(style="darkgrid")
-    if not no_aggregation:
-        aggregated_data = aggregate_data(ping_times, aggregation_interval, method=aggregation_method)
-        agg_time_stamps = [(i * aggregation_interval) + (aggregation_interval / 2) for i in range(len(aggregated_data))]  # Center the aggregate data points
-        df_agg = pd.DataFrame({'Time (s)': agg_time_stamps, 'Ping (ms)': aggregated_data})
-    
-    time_stamps = [i for i in range(len(ping_times))]
-    df_raw = pd.DataFrame({'Time (s)': time_stamps, 'Ping (ms)': ping_times})
-    
-    full_hours = duration // 3600
-    remaining_time = duration % 3600
-
-    current_date = pd.Timestamp.now().strftime('%Y-%m-%d_%H-%M-%S')
-    plot_subfolder = os.path.join(plots_folder, f'plots_{current_date}')
-    os.makedirs(plot_subfolder, exist_ok=True)
-
-    if full_hours < 1:
-        logging.info("Duration is less than 1 hour, generating a single plot")
-        plt.figure(figsize=FIGSIZE)
-        sns.lineplot(x='Time (s)', y='Ping (ms)', data=df_raw, label='Raw Data')
+    try:
         if not no_aggregation:
-            sns.lineplot(x='Time (s)', y='Ping (ms)', data=df_agg, label=f'Aggregated Data ({aggregation_method})', linestyle='dotted', marker='o', linewidth=2.5)
-        plt.title(f'WiFi Network Ping Over Time (Duration: {duration // 60} minutes, Method: {aggregation_method})')
-        plt.xlabel('Time (seconds)')
-        plt.ylabel('Ping (ms)')
-        plt.legend()
-        plt.savefig(os.path.join(plot_subfolder, 'wifi_ping_plot.png'))
-        plt.close()
-        logging.info("Generated plot for the entire duration")
-    else:
-        samples_per_hour = len(df_raw) // full_hours
-        split_dfs_raw = [df_raw.iloc[i * samples_per_hour:(i + 1) * samples_per_hour] for i in range(full_hours)]
-        if not no_aggregation:
-            split_dfs_agg = [df_agg.iloc[i * samples_per_hour:(i + 1) * samples_per_hour] for i in range(full_hours)]
+            aggregated_data = aggregate_data(ping_times, aggregation_interval, method=aggregation_method)
+            agg_time_stamps = [(i * aggregation_interval) + (aggregation_interval / 2) for i in range(len(aggregated_data))]
+            df_agg = pd.DataFrame({'Time (s)': agg_time_stamps, 'Ping (ms)': aggregated_data})
 
-        for i, split_df_raw in enumerate(split_dfs_raw):
+        time_stamps = [i for i in range(len(ping_times))]
+        df_raw = pd.DataFrame({'Time (s)': time_stamps, 'Ping (ms)': ping_times})
+
+        full_hours = duration // 3600
+        remaining_time = duration % 3600
+
+        current_date = pd.Timestamp.now().strftime('%Y-%m-%d_%H-%M-%S')
+        plot_subfolder = os.path.join(plots_folder, f'plots_{current_date}')
+        os.makedirs(plot_subfolder, exist_ok=True)
+
+        if full_hours < 1:
+            logging.info("Duration is less than 1 hour, generating a single plot")
             plt.figure(figsize=FIGSIZE)
-            sns.lineplot(x='Time (s)', y='Ping (ms)', data=split_df_raw, label='Raw Data')
+            sns.lineplot(x='Time (s)', y='Ping (ms)', data=df_raw, label='Raw Data')
             if not no_aggregation:
-                sns.lineplot(x='Time (s)', y='Ping (ms)', data=split_dfs_agg[i], label=f'Aggregated Data ({aggregation_method})', linestyle='dotted', marker='o', linewidth=2.5)
-            plt.title(f'WiFi Network Ping Over Time (Hour {i + 1}, Method: {aggregation_method})')
+                sns.lineplot(x='Time (s)', y='Ping (ms)', data=df_agg, label=f'Aggregated Data ({aggregation_method})', linestyle='dotted', marker='o', linewidth=2.5)
+            plt.title(f'WiFi Network Ping Over Time (Duration: {duration // 60} minutes, Method: {aggregation_method})')
             plt.xlabel('Time (seconds)')
             plt.ylabel('Ping (ms)')
             plt.legend()
-            plt.savefig(os.path.join(plot_subfolder, f'wifi_ping_plot_hour_{i + 1}.png'))
+            plt.savefig(os.path.join(plot_subfolder, 'wifi_ping_plot.png'))
             plt.close()
-            logging.info(f"Generated plot for hour {i + 1}")
+            logging.info("Generated plot for the entire duration")
+        else:
+            samples_per_hour = len(df_raw) // full_hours
+            split_dfs_raw = [df_raw.iloc[i * samples_per_hour:(i + 1) * samples_per_hour] for i in range(full_hours)]
+            if not no_aggregation:
+                split_dfs_agg = [df_agg.iloc[i * samples_per_hour:(i + 1) * samples_per_hour] for i in range(full_hours)]
 
-        if remaining_time > 0:
-            remaining_samples = len(df_raw) - full_hours * samples_per_hour
-            remaining_df_raw = df_raw.iloc[-remaining_samples:]
-            if not no_aggregation:
-                remaining_df_agg = df_agg.iloc[-remaining_samples:]
-            plt.figure(figsize=FIGSIZE)
-            sns.lineplot(x='Time (s)', y='Ping (ms)', data=remaining_df_raw, label='Raw Data')
-            if not no_aggregation:
-                sns.lineplot(x='Time (s)', y='Ping (ms)', data=remaining_df_agg, label=f'Aggregated Data ({aggregation_method})', linestyle='dotted', marker='o', linewidth=2.5)
-            plt.title(f'WiFi Network Ping Over Time (Remaining {remaining_time // 60} minutes, Method: {aggregation_method})')
-            plt.xlabel('Time (seconds)')
-            plt.ylabel('Ping (ms)')
-            plt.legend()
-            plt.savefig(os.path.join(plot_subfolder, 'wifi_ping_plot_remaining.png'))
-            plt.close()
-            logging.info(f"Generated plot for remaining {remaining_time // 60} minutes")
+            for i, split_df_raw in enumerate(split_dfs_raw):
+                plt.figure(figsize=FIGSIZE)
+                sns.lineplot(x='Time (s)', y='Ping (ms)', data=split_df_raw, label='Raw Data')
+                if not no_aggregation:
+                    sns.lineplot(x='Time (s)', y='Ping (ms)', data=split_dfs_agg[i], label=f'Aggregated Data ({aggregation_method})', linestyle='dotted', marker='o', linewidth=2.5)
+                plt.title(f'WiFi Network Ping Over Time (Hour {i + 1}, Method: {aggregation_method})')
+                plt.xlabel('Time (seconds)')
+                plt.ylabel('Ping (ms)')
+                plt.legend()
+                plt.savefig(os.path.join(plot_subfolder, f'wifi_ping_plot_hour_{i + 1}.png'))
+                plt.close()
+                logging.info(f"Generated plot for hour {i + 1}")
+
+            if remaining_time > 0:
+                remaining_samples = len(df_raw) - full_hours * samples_per_hour
+                remaining_df_raw = df_raw.iloc[-remaining_samples:]
+                if not no_aggregation:
+                    remaining_df_agg = df_agg.iloc[-remaining_samples:]
+                plt.figure(figsize=FIGSIZE)
+                sns.lineplot(x='Time (s)', y='Ping (ms)', data=remaining_df_raw, label='Raw Data')
+                if not no_aggregation:
+                    sns.lineplot(x='Time (s)', y='Ping (ms)', data=remaining_df_agg, label=f'Aggregated Data ({aggregation_method})', linestyle='dotted', marker='o', linewidth=2.5)
+                plt.title(f'WiFi Network Ping Over Time (Remaining {remaining_time // 60} minutes, Method: {aggregation_method})')
+                plt.xlabel('Time (seconds)')
+                plt.ylabel('Ping (ms)')
+                plt.legend()
+                plt.savefig(os.path.join(plot_subfolder, 'wifi_ping_plot_remaining.png'))
+                plt.close()
+                logging.info(f"Generated plot for remaining {remaining_time // 60} minutes")
+    except Exception as e:
+        logging.error(f"Error generating plots: {e}")
+        sys.exit(1)
 
 def main():
     initialize_logging()
