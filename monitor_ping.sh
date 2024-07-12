@@ -2,17 +2,23 @@
 
 # Function to show help message
 show_help() {
-  echo "Usage: $0 [-t duration_in_seconds] [-i ip_address] [-f file_to_ping_results.txt] [-p ping_interval] [-r] [-c] [-P] [-R]"
+  echo "Usage: $0 [-t duration_in_seconds] [-i ip_address] [-f file_to_ping_results.txt] [-p ping_interval] [-r] [-c [all|results|plots|logs]] [-P] [-R] [-L] [--no-aggregation]"
   echo
   echo "Options:"
   echo "  -t duration_in_seconds  The amount of time to collect data for, in seconds. Default: 10800 seconds (3 hours)"
   echo "  -i ip_address           The IP address to ping. Default: 8.8.8.8"
   echo "  -f file_to_ping_results.txt  Path to an existing text file with ping results"
   echo "  -p ping_interval        The interval between each ping in seconds. Default: 1 second"
+  echo "  --no-aggregation        Disable data aggregation"
   echo "  -r                      Reset the configuration file to default values"
-  echo "  -c                      Clear all results and plots (with confirmation)"
+  echo "  -c [all|results|plots|logs] Clear specified data (with confirmation)"
+  echo "    all                   Clear all results, plots, and logs"
+  echo "    results               Clear all results"
+  echo "    plots                 Clear all plots"
+  echo "    logs                  Clear all logs"
   echo "  -P                      Clear all plots (with confirmation)"
   echo "  -R                      Clear all results (with confirmation)"
+  echo "  -L                      Clear all logs (with confirmation)"
   echo "  -h                      Show this help message and exit"
 }
 
@@ -93,21 +99,33 @@ plots_folder=${plots_folder:-"plots"}
 log_folder=${log_folder:-"logs"}
 
 # Parse arguments
-while getopts "t:i:f:p:hrcPR" opt; do
+while getopts "t:i:f:p:hrc:P:R:L-:" opt; do
   case $opt in
     t) duration=$OPTARG ;;
     i) ip_address=$OPTARG ;;
     f) text_file=$OPTARG ;;
     p) ping_interval=$OPTARG ;;
     r) reset_config=true ;;
-    c) clear_all=true ;;
+    c)
+      case "$OPTARG" in
+        all) clear_all=true ;;
+        results) clear_results=true ;;
+        plots) clear_plots=true ;;
+        logs) clear_logs=true ;;
+        *) show_help; exit 1 ;;
+      esac ;;
     P) clear_plots=true ;;
     R) clear_results=true ;;
+    L) clear_logs=true ;;
+    -)
+      case "${OPTARG}" in
+        no-aggregation) no_aggregation=true ;;
+        *) show_help; exit 1 ;;
+      esac ;;
     h) show_help; exit 0 ;;
     \?) show_help; exit 1 ;;
   esac
 done
-
 # Handle reset configuration file option
 if [ "$reset_config" = true ]; then
   create_default_config
@@ -136,11 +154,17 @@ clear_plots() {
   echo "All plots have been cleared."
 }
 
+clear_logs() {
+  rm -rf "$log_folder"/*
+  echo "All logs have been cleared."
+}
+
 # Handle clear options with confirmation
 if [ "$clear_all" = true ]; then
   if confirm "clear all results and plots"; then
     clear_results
     clear_plots
+    clear_logs
   else
     echo "Operation cancelled."
   fi
@@ -164,6 +188,16 @@ if [ "$clear_plots" = true ]; then
   fi
   exit 0
 fi
+
+if [ "$clear_logs" = true ]; then
+  if confirm "clear all logs"; then
+    clear_logs
+  else
+    echo "Operation cancelled."
+  fi
+  exit 0
+fi
+
 
 # Create necessary directories
 mkdir -p $results_folder
