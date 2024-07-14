@@ -221,7 +221,8 @@ To reset the configuration file to default values, use the `-r` option:
 - Remove known bugs when -p option is altered. (Chart labels are mismatched, will be fixed soon.) 
 - Enhance data visualization with more advanced charts and interactive features.
 - Continue improving error handling and logging for even better robustness.
-- Explore additional customization options for advanced users through the configuration file.
+- Add support for additional customization options for advanced users through the configuration file.
 - Add support for different output formats, such as JSON or CSV, for the results data.
 - Add automated testing to ensure script reliability and performance.
+- Explore packaging, containerization, and deployment options. 
 - Contributions are welcome.
