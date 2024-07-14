@@ -127,30 +127,82 @@ The script uses a configuration file (`config.yaml`) to manage default settings.
 ### Example Configuration File
 
 ```yaml
+# Default configuration values
+
+# Duration for the ping monitoring in seconds
+# Default: 10800 seconds (3 hours)
 duration: 10800
+
+# IP address to ping
+# Default: "8.8.8.8"
 ip_address: "8.8.8.8"
+
+# Interval between each ping in seconds
+# Default: 1 second
 ping_interval: 1
+
+# Aggregation interval in seconds for data aggregation
+# Default: 60 seconds (1 minute)
 aggregation_interval: 60
 
+# Plotting settings
 plot:
+  # Figure size for the plots
+  # Default: [20, 15]
   figure_size: [20, 15]
+
+  # Dots per inch (DPI) setting for the plots
+  # Default: 100
   dpi: 100
+
+  # Seaborn theme for the plots
+  # Options: "darkgrid", "whitegrid", "dark", "white", "ticks"
+  # Default: "darkgrid"
   theme: "darkgrid"
+
+  # Font sizes for various elements in the plots
   font:
+    # Font size for the plot titles
+    # Default: 24
     title_size: 24
+
+    # Font size for the axis labels
+    # Default: 22
     label_size: 22
+
+    # Font size for the tick labels
+    # Default: 20
     tick_size: 20
+
+    # Font size for the legend
+    # Default: 20
     legend_size: 20
 
+# Data aggregation settings
 aggregation:
-  method: "mean" # Options: mean, median, min, max
-  interval: 60 # Aggregation interval in seconds
+  # Aggregation method
+  # Options: "mean", "median", "min", "max"
+  # Default: "mean"
+  method: "mean"
 
+  # Aggregation interval in seconds
+  # Default: 60 seconds (1 minute)
+  interval: 60
+
+# Data segmentation settings
 segmentation:
+  # Segment data by hour
+  # Default: true
   hourly: true
 
+# Folder paths
+# Directory to save the results
 results_folder: "results"
+
+# Directory to save the plots
 plots_folder: "plots"
+
+# Directory to save the log files
 log_folder: "logs"
 ```
 
