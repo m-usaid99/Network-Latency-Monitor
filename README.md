@@ -1,22 +1,21 @@
 # Ping Plotting Script
 
-This project provides a way to monitor the ping of your WiFi network over a specified period and visualize the results. The script pings a specified IP address at regular intervals, saves the results to a text file, and generates plots to visualize the data.  
+This project provides a way to monitor the ping of your WiFi network over a specified period and visualize the results. The script pings a list of specified IP addresses at regular intervals, saves the results to text files, and generates plots to visualize the data.
 
 ## Prerequisites
 
 - Bash (to run the shell script)
 - Python 3.x
-    - `matplotlib` and `pandas`
-    - `seaborn`
-    - `argparse`
-    - `yaml`
+  - `matplotlib` and `pandas`
+  - `seaborn`
+  - `argparse`
+  - `yaml`
 
 You can install the required python libraries using pip:
 
-    
     pip install matplotlib pandas argparse seaborn pyyaml
 
-or 
+or
 
     pip3 install matplotlib pandas argparse seaborn pyyaml
 
@@ -26,26 +25,25 @@ or
 
 To monitor the ping of your WiFi network, run the monitor_ping.sh script. The script accepts optional arguments for the duration of the monitoring period and the IP address to ping.
 
-    ./monitor_ping.sh [-t duration_in_seconds] [-i ip_address] [-f file_to_ping_results.txt] [-p ping_interval] [--no-aggregation]
+    ./monitor_ping.sh [-t duration_in_seconds] [-f file_to_ping_results.txt] [-p ping_interval] [--no-aggregation] [ip_adresses...]
 
-- ``` -t duration_in_seconds ```: The amount of time to collect data for, in seconds. The default value is 10,800 seconds (3 hours). 
-- ```-i ip_address```: The IP address to ping; Default: 8.8.8.8.
-- ```-f file_to_ping_results.txt```: If a user wants to use a previously generated results file, they can specify it. By default, the script will generate a new results file.
-- ```-p ping_interval```: The time interval in seconds after which each ping is sent. 1 second by default. 
+- `-t duration_in_seconds`: The amount of time to collect data for, in seconds. The default value is 10,800 seconds (3 hours).
+- `-f file_to_ping_results.txt`: If a user wants to use a previously generated results file, they can specify it. By default, the script will generate a new results file.
+- `-p ping_interval`: The time interval in seconds after which each ping is sent. 1 second by default.
 - `--no-aggregation`: Disable data aggregation.
 - `-r`
 - `-c [all|results|plots|logs]`: Clear specified data (with confirmation)
-    - `all`: Clear all results, plots, and logs.
-    - `results`: Clear all results.
-    - `plots`: Clear all plots.
-    - `logs`: Clear all logs.
+  - `all`: Clear all results, plots, and logs.
+  - `results`: Clear all results.
+  - `plots`: Clear all plots.
+  - `logs`: Clear all logs.
 - `-P`: Clear all plots (with confirmation).
 - `-R`: Clear all results (with confirmation).
 - `-L`: Clear all logs (with confirmation).
 - `-h`: Show this help message and exit.
+- `ip_addresses`: List of IP addresses to ping. No arguments provided will default to 8.8.8.8.
 
-Note: The ```-f``` flag will cause the script to ignore any ```-i``` and ```-t``` flags.
-
+Note: The `-f` flag will cause the script to ignore any `-t` and `-p` flags.
 
 Make sure to remember to grant the script permission to run in case it doesn't work by:
 
@@ -54,67 +52,77 @@ Make sure to remember to grant the script permission to run in case it doesn't w
 ### Example Usages
 
 #### Default
+
 To run the default script (3 hours with 1 second intervals, 8.8.8.8, with aggregation):
-    
-    ./monitor_ping.sh 
+
+    ./monitor_ping.sh
 
 #### Custom Duration and IP Address
-To run the script for one hour, and to ping the IP address 1.1.1.1:
 
-    ./monitor_ping.sh -t 3600 -i 1.1.1.1
+To run the script for one hour, and to ping the IP address 1.1.1.1 and 8.8.8.8:
+
+    ./monitor_ping.sh -t 3600 1.1.1.1 8.8.8.8
 
 #### Custom Ping Interval
-This command sets the interval between pings to 2 seconds.
+
+This command sets the interval between pings to 2 seconds, while retaining default values for other options/arguments.
 
     ./monitor_ping.sh -p 2
 
 #### Using an Existing Text File with Ping Results
+
 This command uses an existing text file with ping results instead of running the ping command.
 
     ./monitor_ping.sh -f existing_ping_results.txt
 
 #### Disable Aggregation
+
 This command runs the script without aggregating data.
 
     ./monitor_ping.sh --no-aggregation
+
+Note: For durations less than 60 seconds, aggregation is disabled by default. 
 
 ### Output
 
 The script generates the following outputs:
 
-- Ping Results: A text file in the ```results``` folder containing the raw ping data.
-- Plots: A set of plots in the ```plots``` folder showing the ping times over the monitoring period.
-The output files are named based on the current date and time to avoid conflicts.
+- Ping Results: A text file in the `results` folder containing the raw ping data.
+- Plots: A set of plots in the `plots` folder showing the ping times over the monitoring period.
+  The output files are named based on the current date and time to avoid conflicts. The plots will contain graphs for ping results for each IP address specified along with aggregate values plotted on the same graph. 
 
 ### File Structure
-- ```monitor_ping.sh```: The main script to run the monitoring.
-- ```generate_plots.py```: The Python script that processes the ping results and generates plots.
-- ```config.yaml```: Generated after first run. 
-- ```results/```: Directory containing the ping results text files.
-- ```plots/```: Directory containing the plots.
-- ```logs/```: Directory containing log files.
+
+- `monitor_ping.sh`: The main script to run the monitoring.
+- `generate_plots.py`: The Python script that processes the ping results and generates plots.
+- `config.yaml`: Generated after first run.
+- `results/`: Directory containing the ping results text files.
+- `plots/`: Directory containing the plots.
+- `logs/`: Directory containing log files.
 
 ### Example File Structure
+
 ```
 .
-├── monitor_ping.sh 
-├── generate_plots.py 
+├── monitor_ping.sh
+├── generate_plots.py
 ├── config.yaml
 ├── results/
-│   └── ping_results_2024-07-08_14-23-45.txt
+│   ├── ping_results_1.1.1.1_2024-07-08_14-23-45.txt
+│   └── ping_results_8.8.8.8_2024-07-08_14-23-45.txt
 ├── plots/
 │    └── plots_2024-07-08_14-23-45/
 │        ├── wifi_ping_plot_hour_1.png
 │        ├── wifi_ping_plot_hour_2.png
 │        ├── wifi_ping_plot_hour_3.png
-│        └── wifi_ping_plot_remaining.png	
+│        └── wifi_ping_plot_remaining.png
 └── logs/
     └── monitor_ping_2024-07-08_14-23-45.log
 ```
 
 ## Configuration File
 
-The script uses a configuration file (```config.yaml```) to manage default settings. If the configuration file does not exist, it will be created with default values.
+The script uses a configuration file (`config.yaml`) to manage default settings. If the configuration file does not exist, it will be created with default values.
 
 ### Example Configuration File
 
@@ -135,8 +143,8 @@ plot:
     legend_size: 20
 
 aggregation:
-  method: "mean"  # Options: mean, median, min, max
-  interval: 60    # Aggregation interval in seconds
+  method: "mean" # Options: mean, median, min, max
+  interval: 60 # Aggregation interval in seconds
 
 segmentation:
   hourly: true
@@ -145,9 +153,11 @@ results_folder: "results"
 plots_folder: "plots"
 log_folder: "logs"
 ```
-Users can modify this config file to handle default behavior, although some edge cases might cause irregular behavior. 
+
+Users can modify this config file to handle default behavior, although some edge cases might cause irregular behavior.
 
 ### Reset Configuration File
+
 To reset the configuration file to default values, use the `-r` option:
 
 ```bash
@@ -156,8 +166,7 @@ To reset the configuration file to default values, use the `-r` option:
 
 ## Future Work
 
-- Implement support for pinging multiple addresses concurrently, with options to plot data on the same graph and separate graphs.
-- Further optimize the script to reduce runtime.
+- Remove known bugs when -p option is altered. (Chart labels are mismatched, will be fixed soon.) 
 - Enhance data visualization with more advanced charts and interactive features.
 - Continue improving error handling and logging for even better robustness.
 - Explore additional customization options for advanced users through the configuration file.
