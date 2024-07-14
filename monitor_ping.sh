@@ -2,11 +2,11 @@
 
 # Function to show help message
 show_help() {
-  echo "Usage: $0 [-t duration_in_seconds] [-i ip_address] [-f file_to_ping_results.txt] [-p ping_interval] [-r] [-c [all|results|plots|logs]] [-P] [-R] [-L] [--no-aggregation]"
+  echo "Usage: $0 [-t duration_in_seconds] [-i ip_address(es)] [-f file_to_ping_results.txt] [-p ping_interval] [-r] [-c [all|results|plots|logs]] [-P] [-R] [-L] [--no-aggregation]"
   echo
   echo "Options:"
   echo "  -t duration_in_seconds  The amount of time to collect data for, in seconds. Default: 10800 seconds (3 hours)"
-  echo "  -i ip_address           The IP address to ping. Default: 8.8.8.8"
+  echo "  -i ip_address(es)       The IP address(es) to ping. Use comma to separate multiple IPs. Default: 8.8.8.8"
   echo "  -f file_to_ping_results.txt  Path to an existing text file with ping results"
   echo "  -p ping_interval        The interval between each ping in seconds. Default: 1 second"
   echo "  --no-aggregation        Disable data aggregation"
@@ -132,17 +132,17 @@ try:
         config = yaml.safe_load(f)
         print(config.get('$1', ''))
 except FileNotFoundError:
-    print(f'Error: Configuration file {config_file} not found.', file=sys.stderr)
+    print(f'Error: Configuration file $config_file not found.', file=sys.stderr)
     sys.exit(1)
 except yaml.YAMLError as e:
-    print(f'Error parsing configuration file: {e}', file=sys.stderr)
+    print(f'Error parsing configuration file: $e', file=sys.stderr)
     sys.exit(1)
 "
 }
 
 # Load configuration values
 duration=$(read_config 'duration')
-ip_address=$(read_config 'ip_address')
+ip_addresses=$(read_config 'ip_address')
 ping_interval=$(read_config 'ping_interval')
 results_folder=$(read_config 'results_folder')
 plots_folder=$(read_config 'plots_folder')
@@ -160,7 +160,7 @@ no_aggregation=false
 while getopts "t:i:f:p:hrc:P:R:L-:" opt; do
   case $opt in
   t) duration=$OPTARG ;;
-  i) ip_address=$OPTARG ;;
+  i) ip_addresses=$OPTARG ;;
   f) text_file=$OPTARG ;;
   p) ping_interval=$OPTARG ;;
   r) reset_config=true ;;
@@ -290,13 +290,10 @@ log "Script started"
 
 # Check for conflicting options
 if [ -n "$text_file" ]; then
-  if [ -n "$duration" ] || [ -n "$ip_address" ]; then
+  if [ -n "$duration" ] || [ -n "$ip_addresses" ]; then
     log "Warning: Ignoring -t and -i options because a file was provided with -f"
   fi
 fi
-
-# Define the filename for the ping results
-results_file="$results_folder/ping_results_$current_date.txt"
 
 # Function to draw progress bar
 draw_progress_bar() {
@@ -331,57 +328,61 @@ if [ -n "$text_file" ]; then
   cp "$text_file" "$results_file"
   log "Copied text file $text_file to $results_file"
 else
-  log "Running ping command: ping -i $ping_interval -w $duration $ip_address"
-  ping -i $ping_interval -w $duration $ip_address >$results_file &
-  ping_pid=$!
+  # Split multiple IP addresses into an array
+  IFS=',' read -r -a ip_array <<< "$ip_addresses"
 
-  # Track progress
-  start_time=$(date +%s)
-  while kill -0 $ping_pid 2>/dev/null; do
-    current_time=$(date +%s)
-    elapsed_time=$((current_time - start_time))
-    progress=$((elapsed_time * 100 / duration))
+  # Run ping commands for each IP address in parallel
+  for ip in "${ip_array[@]}"; do
+    {
+      results_file="$results_folder/ping_results_${ip}_$current_date.txt"
+      log "Running ping command: ping -i $ping_interval -w $duration $ip"
+      ping -i $ping_interval -w $duration $ip >"$results_file" &
+      ping_pid=$!
 
-    draw_progress_bar $progress
-    sleep 1
+      # Track progress
+      start_time=$(date +%s)
+      while kill -0 $ping_pid 2>/dev/null; do
+        current_time=$(date +%s)
+        elapsed_time=$((current_time - start_time))
+        progress=$((elapsed_time * 100 / duration))
+
+        draw_progress_bar $progress
+        sleep 1
+      done
+
+      # Final progress update to 100%
+      draw_progress_bar 100
+      echo
+
+      # Wait for ping to complete
+      if ! wait $ping_pid; then
+        log "Error: Ping command did not complete successfully."
+        exit 1
+      fi
+      echo -e "\nPing command completed."
+
+      # Extract packet loss information and append to results file
+      packet_loss=$(grep -oP '\d+(?=% packet loss)' $results_file | tail -1)
+      if [ -z "$packet_loss" ]; then
+        log "Error: Failed to extract packet loss information."
+        exit 1
+      fi
+      echo "Packet Loss: $packet_loss%" >>$results_file
+      log "Packet loss information appended to results file"
+
+      # Run the Python script to generate the plots
+      log "Running Python script to generate plots"
+      if ! python3 generate_plots.py "$results_file" "$plots_folder" $([ "$no_aggregation" = true ] && echo "--no-aggregation") 2>&1 | tee -a $log_file; then
+        log "Error: Python script failed to generate plots."
+        exit 1
+      fi
+      log "Python script completed"
+    } &
   done
 
-  # Final progress update to 100%
-  draw_progress_bar 100
-  echo
-
-  # Wait for ping to complete
-  if ! wait $ping_pid; then
-    log "Error: Ping command did not complete successfully."
-    exit 1
-  fi
-  echo -e "\nPing command completed."
-
-  # Extract packet loss information and append to results file
-  packet_loss=$(grep -oP '\d+(?=% packet loss)' $results_file | tail -1)
-  if [ -z "$packet_loss" ]; then
-    log "Error: Failed to extract packet loss information."
-    exit 1
-  fi
-  echo "Packet Loss: $packet_loss%" >>$results_file
-  log "Packet loss information appended to results file"
+  # Wait for all background jobs to finish
+  wait
 fi
 
-# Determine if no aggregation should be forced based on duration
-if [ "$duration" -lt 60 ]; then
-  no_aggregation=true
-fi
+log "Script finished"
 
-# Check if results file is empty
-if [ ! -s "$results_file" ]; then
-  log "Error: Results file is empty or not found."
-  exit 1
-fi
-
-# Run the Python script to generate the plots
-log "Running Python script to generate plots"
-if ! python3 generate_plots.py "$results_file" "$plots_folder" $([ "$no_aggregation" = true ] && echo "--no-aggregation") 2>&1 | tee -a $log_file; then
-  log "Error: Python script failed to generate plots."
-  exit 1
-fi
-log "Python script completed"
