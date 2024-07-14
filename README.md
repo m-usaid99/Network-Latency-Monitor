@@ -41,7 +41,7 @@ To monitor the ping of your WiFi network, run the monitor_ping.sh script. The sc
 - `-R`: Clear all results (with confirmation).
 - `-L`: Clear all logs (with confirmation).
 - `-h`: Show this help message and exit.
-- `ip_addresses`: List of IP addresses to ping. No arguments provided will default to 8.8.8.8.
+- `ip_addresses`: List of space-separated IP addresses to ping. No arguments provided will default to 8.8.8.8.
 
 Note: The `-f` flag will cause the script to ignore any `-t` and `-p` flags.
 
@@ -57,7 +57,7 @@ To run the default script (3 hours with 1 second intervals, 8.8.8.8, with aggreg
 
     ./monitor_ping.sh
 
-#### Custom Duration and IP Address
+#### Custom Duration and IP Addresses
 
 To run the script for one hour, and to ping the IP address 1.1.1.1 and 8.8.8.8:
 
@@ -82,6 +82,16 @@ This command runs the script without aggregating data.
     ./monitor_ping.sh --no-aggregation
 
 Note: For durations less than 60 seconds, aggregation is disabled by default. 
+
+### Comprehensive Example
+
+This example includes all possible customizable options with a list of IP addresses to ping:
+
+    ./monitor_ping.sh -t 1800 -p 3 --no-aggregation 1.1.1.1 8.8.8.8
+
+This command will ping 1.1.1.1 and 8.8.8.8 for 30 minutes every 3 seconds, without recording/plotting any aggregate data. 
+
+**IMPORTANT:** The list of IP addresses should be passed as a space-separated list as the last argument to the script. 
 
 ### Output
 
