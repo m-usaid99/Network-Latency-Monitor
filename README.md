@@ -81,7 +81,7 @@ This command runs the script without aggregating data.
 
     ./monitor_ping.sh --no-aggregation
 
-Note: For durations less than 60 seconds, aggregation is disabled by default. 
+Note: For durations less than 60 seconds, aggregation is disabled by default.
 
 ### Comprehensive Example
 
@@ -89,9 +89,9 @@ This example includes all possible customizable options with a list of IP addres
 
     ./monitor_ping.sh -t 1800 -p 3 --no-aggregation 1.1.1.1 8.8.8.8
 
-This command will ping 1.1.1.1 and 8.8.8.8 for 30 minutes every 3 seconds, without recording/plotting any aggregate data. 
+This command will ping 1.1.1.1 and 8.8.8.8 for 30 minutes every 3 seconds, without recording/plotting any aggregate data.
 
-**IMPORTANT:** The list of IP addresses should be passed as a space-separated list as the last argument to the script. 
+**IMPORTANT:** The list of IP addresses should be passed as a space-separated list as the last argument to the script.
 
 ### Output
 
@@ -99,7 +99,7 @@ The script generates the following outputs:
 
 - Ping Results: A text file in the `results` folder containing the raw ping data.
 - Plots: A set of plots in the `plots` folder showing the ping times over the monitoring period.
-  The output files are named based on the current date and time to avoid conflicts. The plots will contain graphs for ping results for each IP address specified along with aggregate values plotted on the same graph. 
+  The output files are named based on the current date and time to avoid conflicts. The plots will contain graphs for ping results for each IP address specified along with aggregate values plotted on the same graph.
 
 ### File Structure
 
@@ -228,11 +228,11 @@ To reset the configuration file to default values, use the `-r` option:
 
 ## Future Work
 
-- Remove known bugs when -p option is altered. (Chart labels are mismatched, will be fixed soon.) 
+- Remove known bugs when -p option is altered. (Chart labels are mismatched, will be fixed soon.)
 - Enhance data visualization with more advanced charts and interactive features.
 - Continue improving error handling and logging for even better robustness.
 - Add support for additional customization options for advanced users through the configuration file.
 - Add support for different output formats, such as JSON or CSV, for the results data.
 - Add automated testing to ensure script reliability and performance.
-- Explore packaging, containerization, and deployment options. 
+- Explore packaging, containerization, and deployment options.
 - Contributions are welcome.
