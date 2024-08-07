@@ -154,13 +154,17 @@ log_folder=${log_folder:-"logs"}
 
 # Initialize variables
 no_aggregation=false
+file_mode=false  # New flag to indicate file mode
 
 # Parse arguments
 while getopts "t:p:f:hrc:P:R:L-:" opt; do
   case $opt in
   t) duration=$OPTARG ;;
   p) ping_interval=$OPTARG ;;
-  f) text_file=$OPTARG ;;
+  f) 
+    text_file=$OPTARG 
+    file_mode=true  # Set file mode when -f is provided
+    ;;
   r) reset_config=true ;;
   c)
     case "$OPTARG" in
@@ -295,11 +299,15 @@ log() {
 
 log "Script started"
 
-# Check for conflicting options
-if [ -n "$text_file" ]; then
-  if [ -n "$duration" ] || [ -n "$ip_addresses" ]; then
-    log "Warning: Ignoring -t and -i options because a file was provided with -f"
+# If file mode is enabled, directly call the Python script with the provided file(s)
+if [ "$file_mode" = true ]; then
+  log "File mode enabled. Processing file(s) directly with Python script."
+  if ! python3 generate_plots.py $text_file "$plots_folder" $([ "$no_aggregation" = true ] && echo "--no-aggregation") 2>&1 | tee -a $log_file; then
+    log "Error: Python script failed to generate plots."
+    exit 1
   fi
+  log "Python script completed"
+  exit 0
 fi
 
 # Function to draw progress bar
@@ -329,7 +337,7 @@ draw_progress_bar() {
 # Run ping for each IP address concurrently
 for ip in "${ip_addresses[@]}"; do
   results_file="$results_folder/ping_results_${ip}_$current_date.txt"
-  log "Running ping for IP: $ip"
+  log "Running ping for IP: $ip for $duration seconds."
   ping -i $ping_interval -w $duration $ip >"$results_file" &
   pids+=($!)
 done
