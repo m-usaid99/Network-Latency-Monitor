@@ -1,5 +1,35 @@
 # Ping Plotting Script
 
+<!--toc:start-->
+
+- [Ping Plotting Script](#ping-plotting-script)
+  - [Prerequisites](#prerequisites)
+  - [Usage](#usage)
+    - [Running the Script](#running-the-script)
+    - [Example Usages](#example-usages)
+      - [Default](#default)
+      - [Custom Duration and IP Addresses](#custom-duration-and-ip-addresses)
+      - [Custom Ping Interval](#custom-ping-interval)
+      - [Using an Existing Text File with Ping Results](#using-an-existing-text-file-with-ping-results)
+      - [Disable Aggregation](#disable-aggregation)
+    - [Comprehensive Example](#comprehensive-example)
+    - [Using Docker](#using-docker)
+      - [Prerequisites](#prerequisites)
+      - [Building the Docker Image](#building-the-docker-image)
+      - [Running the Docker Container](#running-the-docker-container)
+      - [Examples](#examples)
+      - [Docker Command Breakdown](#docker-command-breakdown)
+      - [Accessing Generated Plots and Logs](#accessing-generated-plots-and-logs)
+      - [Cleaning Up](#cleaning-up)
+    - [Output](#output)
+    - [File Structure](#file-structure)
+    - [Example File Structure](#example-file-structure)
+  - [Configuration File](#configuration-file)
+    - [Example Configuration File](#example-configuration-file)
+    - [Reset Configuration File](#reset-configuration-file)
+  - [Future Work](#future-work)
+  <!--toc:end-->
+
 This project provides a way to monitor the ping of your WiFi network over a specified period and visualize the results. The script pings a list of specified IP addresses at regular intervals, saves the results to text files, and generates plots to visualize the data.
 
 ## Prerequisites
@@ -25,7 +55,9 @@ or
 
 To monitor the ping of your WiFi network, run the monitor_ping.sh script. The script accepts optional arguments for the duration of the monitoring period and the IP address to ping.
 
+```bash
     ./monitor_ping.sh [-t duration_in_seconds] [-f file_to_ping_results.txt] [-p ping_interval] [--no-aggregation] [ip_adresses...]
+```
 
 - `-t duration_in_seconds`: The amount of time to collect data for, in seconds. The default value is 10,800 seconds (3 hours).
 - `-f file_to_ping_results.txt`: If a user wants to use a previously generated results file, they can specify it. By default, the script will generate a new results file.
@@ -92,6 +124,104 @@ This example includes all possible customizable options with a list of IP addres
 This command will ping 1.1.1.1 and 8.8.8.8 for 30 minutes every 3 seconds, without recording/plotting any aggregate data.
 
 **IMPORTANT:** The list of IP addresses should be passed as a space-separated list as the last argument to the script.
+
+### Using Docker
+
+#### Prerequisites
+
+Ensure you have docker installed on your system. You can download and install docker from the [docker official website](https://www.docker.com).
+
+#### Building the Docker Image
+
+1. Clone the repository and navigate to the project directory.
+
+```bash
+git clone https://github.com/m-usaid99/PingPlottingScript.git
+cd PingPlottingScript
+```
+
+2. Build the Docker image.
+
+```bash
+docker build -t monitor_ping_image .
+```
+
+#### Running the Docker Container
+
+Run the Docker container with the desired options. Replace `<options>` with the options you want to pass to the `monitor_ping.sh` script.
+
+```bash
+docker run --name monitor_ping_container monitor_ping_image <options>
+```
+
+#### Examples
+
+**Example 1: Basic Usage**
+
+Run the monitor for 60 seconds with a 1-second interval pinging 8.8.8.8:
+
+```bash
+docker run --name monitor_ping_container monitor_ping_image -t 60 -p 1 8.8.8.8
+```
+
+**Example 2: Using No Aggregation**
+
+Run the monitor for 120 seconds with a 2-second interval pinging 8.8.8.8 and 1.1.1.1, without aggregation:
+
+```bash
+docker run --name monitor_ping_container monitor_ping_image -t 120 -p 2 --no-aggregation 8.8.8.8 1.1.1.1
+
+```
+
+**Example 3: Using an Existing Ping Results File**
+
+Run the monitor using an existing ping results file:
+
+```bash
+docker run --name monitor_ping_container monitor_ping_image -f /path/to/ping_results.txt
+```
+
+#### Docker Command Breakdown
+
+- `docker run`: Command to run a Docker container.
+- `--name monitor_ping_container`: Names the container `monitor_ping_container`
+- `monitor_ping_image`: Specifies the Docker image to use.
+- `<options>`: Options and arguments to pass to the `monitor_ping.sh` script inside the container.
+
+#### Accessing Generated Plots and Logs
+
+The `monitor_ping.sh` script generates plots and logs during its execution. These files are stored inside the Docker container. To access these files, you can use the `docker cp` command to copy them from the container to your host machine.
+
+**1. Copy Results from the Container**
+
+```bash
+docker cp monitor_ping_container:/app/results ./results
+docker cp monitor_ping_container:/app/plots ./plots
+docker cp monitor_ping_container:/app/logs ./logs
+```
+
+**2. Stop and Remove the Container (optional)**
+
+```bash
+docker stop monitor_ping_container
+docker rm monitor_ping_container
+```
+
+#### Cleaning Up
+
+To remove the Docker image and container when you are done, you can use the following commands:
+
+**1. Remove the Container:**
+
+```bash
+docker rm monitor_ping_container
+```
+
+**2. Remove the Docker Image:**
+
+```bash
+docker rmi monitor_ping_image
+```
 
 ### Output
 
