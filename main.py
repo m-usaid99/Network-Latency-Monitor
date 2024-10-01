@@ -24,13 +24,17 @@ from utils import clear_data
 import pandas as pd
 
 
-def ask_confirmation(message: str) -> bool:
+def ask_confirmation(message: str, auto_confirm: bool) -> bool:
     """
-    Prompts the user for a yes/no confirmation.
+    Prompts the user for a yes/no confirmation unless auto_confirm is True.
 
     :param message: The confirmation message to display.
-    :return: True if user confirms, False otherwise.
+    :param auto_confirm: If True, automatically confirm without prompting.
+    :return: True if user confirms or auto_confirm is True, False otherwise.
     """
+    if auto_confirm:
+        return True
+
     while True:
         response = input(f"{message} [y/N]: ").strip().lower()
         if response in ["y", "yes"]:
@@ -83,11 +87,7 @@ async def run_pings_with_progress(args, config, results_subfolder):
 async def main():
     args = parse_arguments()
     config = load_config()
-    setup_logging(config.get("log_folder", "logs"))
-
-    logging.info("Configuration and arguments loaded.")
-    logging.info(f"Configuration: {config}")
-    logging.info(f"Arguments: {args}")
+    setup_logging(config.get("log_folder", "logs"))  # Initialize logging
 
     # Handle clear operations if any
     if args.clear or args.clear_plots or args.clear_results or args.clear_logs:
@@ -112,7 +112,7 @@ async def main():
             confirmation_message = "Are you sure you want to clear the selected data?"
 
         if folders_to_clear:
-            if ask_confirmation(confirmation_message):
+            if ask_confirmation(confirmation_message, args.yes):
                 clear_data(args, config)
                 logging.info("Clear operation completed.")
             else:
@@ -121,14 +121,12 @@ async def main():
 
     # If file mode is enabled, process the file directly
     if args.file:
-        logging.info(f"Processing ping result file: {args.file}")
         process_ping_file(
             file_path=args.file,
             config=config,
             no_aggregation=args.no_aggregation,
             duration=args.duration,
         )
-        logging.info("Processing of ping file completed.")
         return
 
     # Determine IP addresses
@@ -142,7 +140,6 @@ async def main():
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     results_subfolder = os.path.join(results_folder, f"results_{timestamp}")
     os.makedirs(results_subfolder, exist_ok=True)
-    logging.info(f"Created results subdirectory: {results_subfolder}")
 
     # Run pings with progress tracking
     await run_pings_with_progress(args, config, results_subfolder)
@@ -168,9 +165,6 @@ async def main():
 
         # Determine if aggregation should be enforced based on duration
         if args.duration < 60:
-            logging.info(
-                f"Duration ({args.duration}s) is less than 60 seconds. Aggregation disabled for {ip_address}."
-            )
             aggregate = False
         else:
             aggregate = not args.no_aggregation
