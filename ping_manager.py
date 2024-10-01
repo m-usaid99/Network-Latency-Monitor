@@ -12,8 +12,6 @@ async def run_ping(ip_address, duration, interval, results_file):
         # On Windows, the command and parameters would differ
         cmd = ["ping", ip_address, "-i", str(interval), "-w", str(duration)]
 
-        logging.info(f"Starting ping for {ip_address}")
-
         with open(results_file, "w") as f:
             process = await asyncio.create_subprocess_exec(
                 *cmd, stdout=f, stderr=asyncio.subprocess.PIPE

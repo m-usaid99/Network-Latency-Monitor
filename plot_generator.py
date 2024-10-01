@@ -6,7 +6,7 @@ import os
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
-from typing import List, Tuple, Dict, Optional
+from typing import List, Tuple, Dict
 
 
 def extract_ping_times(file_path: str) -> List[float]:
@@ -77,9 +77,7 @@ def aggregate_ping_times(
     return aggregated_data
 
 
-def generate_plots(
-    config: dict, data_dict: Dict[str, Dict[str, Optional[pd.DataFrame]]]
-) -> None:
+def generate_plots(config: dict, data_dict: Dict[str, Dict[str, pd.DataFrame]]) -> None:
     """
     Generates and saves the plot based on the provided data.
 
@@ -100,6 +98,10 @@ def generate_plots(
 
     # Initialize color palette based on number of IPs
     num_ips = len(data_dict)
+    if num_ips == 0:
+        logging.warning("No data available for plotting.")
+        return
+
     colors = sns.color_palette("husl", n_colors=num_ips)
     ip_color_map = {ip: colors[idx] for idx, ip in enumerate(data_dict.keys())}
 
@@ -182,16 +184,7 @@ def process_ping_file(
     :param no_aggregation: Boolean flag to disable aggregation.
     :param duration: Total duration of the ping monitoring in seconds.
     """
-    # Extract IP from filename
-    base_name = os.path.basename(file_path)
-    parts = base_name.split("_")
-    if len(parts) < 3:
-        logging.error(
-            f"Filename {base_name} does not conform to expected format. Skipping."
-        )
-        return
-    ip_address = parts[2].split(".")[0]  # Extract IP from filename
-
+    ip_address = os.path.basename(file_path).split("_")[2]  # Extract IP from filename
     ping_times = extract_ping_times(file_path)
 
     if not ping_times:
@@ -237,6 +230,13 @@ def process_ping_file(
     # Prepare data dictionary
     data_dict = {ip_address: {"raw": raw_df, "aggregated": agg_df}}
 
+    # Create plot subdirectory
+    plots_folder = config.get("plots_folder", "plots")
+    current_date = pd.Timestamp.now().strftime("%Y-%m-%d_%H-%M-%S")
+    plot_subfolder = os.path.join(plots_folder, f"plots_{current_date}")
+    os.makedirs(plot_subfolder, exist_ok=True)
+    logging.info(f"Created plot subdirectory: {plot_subfolder}")
+
     # Generate and save the plot
-    generate_plots(config=config, data_dict=data_dict)
+    generate_plots(config, data_dict)
 

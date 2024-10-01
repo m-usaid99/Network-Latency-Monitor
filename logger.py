@@ -27,14 +27,12 @@ def setup_logging(log_folder: str) -> None:
     formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
     file_handler.setFormatter(formatter)
 
-    # Add handlers to the logger
-    logger.addHandler(file_handler)
-
-    # Optionally, remove other handlers if they exist to prevent duplicate logs
+    # Clear existing handlers to prevent duplicate logs
     if logger.hasHandlers():
-        for handler in logger.handlers:
-            if isinstance(handler, logging.StreamHandler):
-                logger.removeHandler(handler)
+        logger.handlers.clear()
+
+    # Add the FileHandler to the logger
+    logger.addHandler(file_handler)
 
     logger.info(f"Logging initialized. Logs are being written to: {log_file}")
 
