@@ -32,12 +32,14 @@ from utils import clear_data
 from typing import Dict
 
 
-# TODO: - Fix the issue regarding nan values in aggregate
-#       - examine packet loss data and see how to incorporate it better
+# TODO: - examine packet loss data and see how to incorporate it better
 #       - Turn it into a python package to make it pip installable
 #       - add cross platform compatibility
 #       - Look up how to incorporate real-time graph.
 #       - update documentation to reflect changes
+#
+# FIX: - nan values in aggregate
+#      - fix progress bar 100% completion issue
 
 # Initialize Rich Console
 console = Console()
