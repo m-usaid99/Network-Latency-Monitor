@@ -6,33 +6,43 @@ import os
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Optional
+from rich.table import Table
+from rich.console import Console
 
 
-def extract_ping_times(file_path: str) -> List[float]:
+def extract_ping_times(file_path: str) -> List[Optional[float]]:
     """
     Extracts ping times from a ping result file, caps them at 800 ms,
-    and returns a list of ping times.
+    and returns a list of ping times where lost pings are represented as None.
 
     :param file_path: Path to the ping result file.
-    :return: List of capped ping times.
+    :return: List of ping times with None for lost pings.
     """
-    ping_times = []
-    pattern = re.compile(r"time=(\d+\.?\d*) ms")
+    ping_times: List[Optional[float]] = []
 
     try:
         with open(file_path, "r") as file:
             for line in file:
-                match = pattern.search(line)
-                if match:
-                    ping_time = float(match.group(1))
-                    if ping_time > 800.0:
-                        ping_time = 800.0
+                line = line.strip()
+                if line.lower() == "lost":
+                    ping_times.append(None)
+                else:
+                    try:
+                        ping_time = float(line)
+                        if ping_time > 800.0:
+                            ping_time = 800.0
+                            logging.warning(
+                                f"Capped ping time at 800 ms in file {file_path}"
+                            )
+                        ping_times.append(ping_time)
+                    except ValueError:
+                        # Handle unexpected line format
+                        ping_times.append(None)
                         logging.warning(
-                            f"Capped ping time at 800 ms in file {file_path}"
+                            f"Unexpected line format in {file_path}: {line}"
                         )
-                    ping_times.append(ping_time)
-        logging.info(f"Extracted {len(ping_times)} ping times from {file_path}")
+        logging.info(f"Extracted {len(ping_times)} ping attempts from {file_path}")
     except FileNotFoundError:
         logging.error(f"Ping result file {file_path} not found.")
     except Exception as e:
@@ -41,38 +51,88 @@ def extract_ping_times(file_path: str) -> List[float]:
     return ping_times
 
 
+def display_summary(data_dict: dict) -> None:
+    """
+    Displays summary statistics for each IP address using Rich's Table.
+
+    :param data_dict: Dictionary containing ping data for each IP.
+    """
+    console = Console()
+    table = Table(title="Ping Summary Statistics")
+
+    table.add_column("IP Address", style="cyan", no_wrap=True)
+    table.add_column("Total Pings", style="magenta")
+    table.add_column("Successful Pings", style="green")
+    table.add_column("Packet Loss (%)", style="red")
+    table.add_column("Average Latency (ms)", style="yellow")
+    table.add_column("Min Latency (ms)", style="blue")
+    table.add_column("Max Latency (ms)", style="blue")
+
+    for ip, data in data_dict.items():
+        ping_times = data["raw"]["Ping (ms)"].tolist()
+        total_pings = len(ping_times)
+        successful_pings = len([pt for pt in ping_times if pt is not None])
+        lost_pings = total_pings - successful_pings
+        packet_loss = (lost_pings / total_pings) * 100 if total_pings > 0 else 0
+        average_latency = (
+            sum(pt for pt in ping_times if pt is not None) / successful_pings
+            if successful_pings > 0
+            else 0
+        )
+        min_latency = (
+            min(pt for pt in ping_times if pt is not None)
+            if successful_pings > 0
+            else 0
+        )
+        max_latency = (
+            max(pt for pt in ping_times if pt is not None)
+            if successful_pings > 0
+            else 0
+        )
+
+        table.add_row(
+            ip,
+            str(total_pings),
+            str(successful_pings),
+            f"{packet_loss:.2f}%",
+            f"{average_latency:.2f}",
+            str(min_latency),
+            str(max_latency),
+        )
+
+    console.print(table)
+
+
 def aggregate_ping_times(
-    ping_times: List[float], interval: int = 60
-) -> List[Tuple[float, float]]:
+    ping_times: List[Optional[float]], interval: int
+) -> List[Tuple[int, float]]:
     """
-    Aggregates ping times into mean latencies per specified interval.
+    Aggregates ping times over specified intervals.
 
-    :param ping_times: List of capped ping times.
-    :param interval: Aggregation interval in seconds (default: 60).
-    :return: List of tuples (timestamp, mean_latency).
+    :param ping_times: List of ping times where None represents a lost ping.
+    :param interval: Interval in seconds to aggregate pings.
+    :return: List of tuples containing (Time Interval, Mean Latency)
     """
-    aggregated_data: List[Tuple[float, float]] = []
-    total_pings = len(ping_times)
-    num_full_intervals = total_pings // interval
+    aggregated_data = []
+    total_intervals = len(ping_times) // interval
 
-    for i in range(num_full_intervals):
-        start_idx = i * interval
-        end_idx = start_idx + interval
-        interval_pings = ping_times[start_idx:end_idx]
-        mean_latency = sum(interval_pings) / len(interval_pings)
-        # Timestamp at the center of the interval
-        timestamp = (start_idx + end_idx) / 2
-        aggregated_data.append((timestamp, mean_latency))
-
-    # Handle remaining pings that don't form a full interval
-    remaining_pings = ping_times[num_full_intervals * interval :]
-    if remaining_pings:
-        mean_latency = sum(remaining_pings) / len(remaining_pings)
-        # Timestamp at the center of the remaining interval
-        timestamp = num_full_intervals * interval + len(remaining_pings) / 2
-        aggregated_data.append((timestamp, mean_latency))
-
-    logging.info(f"Aggregated ping times into {len(aggregated_data)} intervals.")
+    for i in range(total_intervals):
+        start = i * interval
+        end = start + interval
+        interval_pings = ping_times[start:end]
+        # Filter out None values
+        successful_pings = [pt for pt in interval_pings if pt is not None]
+        if successful_pings:
+            mean_latency = sum(successful_pings) / len(successful_pings)
+            aggregated_data.append((i * interval, mean_latency))
+        else:
+            # If all pings in the interval were lost, you can decide how to handle it
+            aggregated_data.append(
+                (i * interval, 0.0)
+            )  # Assuming 0 latency for all lost pings
+            logging.warning(
+                f"All pings lost in interval {i * interval} to {end} seconds."
+            )
 
     return aggregated_data
 
@@ -239,4 +299,3 @@ def process_ping_file(
 
     # Generate and save the plot
     generate_plots(config, data_dict)
-

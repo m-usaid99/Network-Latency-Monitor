@@ -1,16 +1,9 @@
 # main.py
 
 import asyncio
+import sys
 import logging
 import os
-import sys
-import time
-from datetime import datetime
-
-from cli import parse_arguments
-from config import load_config
-from logger import setup_logging
-from ping_manager import run_ping  # Ensure this is correctly implemented
 from rich.console import Console
 from rich.prompt import Prompt
 from rich.progress import (
@@ -21,16 +14,22 @@ from rich.progress import (
     TimeElapsedColumn,
     TimeRemainingColumn,
 )
+from datetime import datetime
+import pandas as pd
+import ipaddress
 
+from cli import parse_arguments
+from config import load_config
+from logger import setup_logging
+from ping_manager import run_ping
 from plot_generator import (
     extract_ping_times,
     aggregate_ping_times,
     generate_plots,
     process_ping_file,
+    display_summary,
 )
 from utils import clear_data
-
-import pandas as pd
 
 # Initialize Rich Console
 console = Console()
@@ -39,10 +38,6 @@ console = Console()
 def ask_confirmation(message: str, auto_confirm: bool) -> bool:
     """
     Prompts the user for a yes/no confirmation unless auto_confirm is True.
-
-    :param message: The confirmation message to display.
-    :param auto_confirm: If True, automatically confirm without prompting.
-    :return: True if user confirms or auto_confirm is True, False otherwise.
     """
     if auto_confirm:
         return True
@@ -54,10 +49,6 @@ def ask_confirmation(message: str, auto_confirm: bool) -> bool:
 async def run_pings_with_progress(args, config, results_subfolder):
     """
     Executes ping tasks with separate progress bars for each IP.
-
-    :param args: Parsed command-line arguments.
-    :param config: Configuration dictionary.
-    :param results_subfolder: Subdirectory to store ping result files.
     """
     duration = args.duration
     ping_interval = args.ping_interval
@@ -66,7 +57,7 @@ async def run_pings_with_progress(args, config, results_subfolder):
 
     with Progress(
         SpinnerColumn(),
-        TextColumn("[bold blue]{task.description}"),
+        TextColumn("[bold blue]Pinging {task.description}"),
         BarColumn(),
         "[progress.percentage]{task.percentage:>3.1f}%",
         TimeElapsedColumn(),
@@ -93,6 +84,27 @@ async def run_pings_with_progress(args, config, results_subfolder):
         await asyncio.gather(*tasks)
 
 
+def validate_ips(ips: list) -> list:
+    """
+    Validates the list of IP addresses.
+    """
+    validated_ips = []
+    for ip in ips:
+        try:
+            ipaddress.ip_address(ip)
+            validated_ips.append(ip)
+        except ValueError:
+            console.print(f"[bold red]Invalid IP address:[/bold red] {ip}")
+            logging.error(f"Invalid IP address provided: {ip}")
+
+    if not validated_ips:
+        console.print("[bold red]No valid IP addresses provided. Exiting.[/bold red]")
+        logging.error("No valid IP addresses provided. Exiting.")
+        sys.exit(1)
+
+    return validated_ips
+
+
 async def main():
     # Parse command-line arguments
     args = parse_arguments()
@@ -107,7 +119,6 @@ async def main():
 
     # Handle clear operations if any
     if args.clear or args.clear_plots or args.clear_results or args.clear_logs:
-        # Determine which folders to clear based on arguments
         folders_to_clear = []
         if args.clear:
             folders_to_clear = [
@@ -164,6 +175,9 @@ async def main():
         )
         logging.info(f"No IP addresses provided. Using default IP: {default_ip}")
 
+    # Validate IP addresses
+    args.ip_addresses = validate_ips(args.ip_addresses)
+
     # Create results subdirectory with timestamp
     results_folder = config.get("results_folder", "results")
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -213,6 +227,7 @@ async def main():
             aggregate = not args.no_aggregation
 
         if aggregate:
+            # Option 1: Modify aggregate_ping_times to accept List[Optional[float]]
             aggregated_data = aggregate_ping_times(ping_times, interval=60)
             agg_df = pd.DataFrame(
                 aggregated_data, columns=["Time (s)", "Mean Latency (ms)"]
@@ -237,6 +252,15 @@ async def main():
     else:
         console.print("[bold red]No data available for plotting.[/bold red]")
         logging.warning("No data available for plotting.")
+
+    # Display summary statistics
+    if data_dict:
+        console.print("[bold blue]Displaying Summary Statistics...[/bold blue]")
+        display_summary(data_dict)
+        logging.info("Summary statistics displayed.")
+    else:
+        console.print("[bold red]No data available for summary statistics.[/bold red]")
+        logging.warning("No data available for summary statistics.")
 
 
 if __name__ == "__main__":

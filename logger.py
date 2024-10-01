@@ -17,7 +17,7 @@ def setup_logging(log_folder: str) -> None:
 
     # Create a custom logger
     logger = logging.getLogger()
-    logger.setLevel(logging.INFO)  # Set the desired logging level
+    logger.setLevel(logging.DEBUG)  # Set the desired logging level
 
     # Create handlers
     file_handler = logging.FileHandler(log_file)
@@ -35,4 +35,3 @@ def setup_logging(log_folder: str) -> None:
     logger.addHandler(file_handler)
 
     logger.info(f"Logging initialized. Logs are being written to: {log_file}")
-

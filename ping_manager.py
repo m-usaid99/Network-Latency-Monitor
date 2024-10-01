@@ -52,28 +52,33 @@ async def run_ping(
             )
             stdout, stderr = await proc.communicate()
 
+            raw_output = stdout.decode().strip()
+            error_output = stderr.decode().strip()
+
+            # Log raw output for debugging
+            if error_output:
+                logging.debug(f"Ping Error for {ip_address}: {error_output}")
+
             if proc.returncode == 0:
-                output = stdout.decode()
-                match = latency_regex.search(output)
+                match = latency_regex.search(raw_output)
                 if match:
                     current_latency = float(match.group(1))
                 else:
                     # If latency not found, assume packet loss or unknown latency
                     current_latency = None
                     logging.warning(
-                        f"Could not parse latency from ping output for {ip_address}. Output: {output}"
+                        f"Could not parse latency from ping output for {ip_address}. Output: {raw_output}"
                     )
             else:
                 # Non-zero return code indicates an error or packet loss
-                output = stderr.decode()
                 current_latency = None
-                logging.error(f"Ping failed for {ip_address}. Error: {output}")
+                logging.error(f"Ping failed for {ip_address}. Error: {error_output}")
 
             # Update progress bar
             if current_latency is not None:
                 # Cap latency at 800 ms for display purposes
                 display_latency = min(current_latency, 800.0)
-                description = f"Pinging [cyan]{ip_address} - {display_latency} ms"
+                description = f"[cyan]{ip_address} - {display_latency} ms"
                 progress.update(task_id, advance=interval, description=description)
                 logging.info(f"Ping to {ip_address}: {current_latency} ms")
             else:
@@ -97,4 +102,3 @@ async def run_ping(
                 f.write(f"Error: {e}\n")
 
         await asyncio.sleep(interval)
-

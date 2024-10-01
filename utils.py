@@ -51,4 +51,3 @@ def clear_data(args: argparse.Namespace, config: dict) -> None:
                 logging.info(f"Cleared logs folder: {folder}")
             else:
                 logging.warning(f"Logs folder not found: {folder}")
-
