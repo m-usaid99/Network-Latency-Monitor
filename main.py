@@ -237,6 +237,12 @@ def process_ping_results(results_subfolder, args) -> Dict[str, Dict[str, pd.Data
             agg_df = pd.DataFrame(
                 aggregated_data, columns=["Time (s)", "Mean Latency (ms)"]
             )
+            # Ensure no NaN values in agg_df
+            agg_df["Mean Latency (ms)"] = agg_df["Mean Latency (ms)"].fillna(0.0)
+            logging.debug(f"Aggregated data for {ip_address}: {aggregated_data}")
+            logging.info(
+                f"Aggregated {len(aggregated_data)} intervals for {ip_address}."
+            )
         else:
             agg_df = None
 

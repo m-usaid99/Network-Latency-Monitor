@@ -68,35 +68,37 @@ def display_summary(data_dict: dict) -> None:
     table.add_column("Max Latency (ms)", style="blue")
 
     for ip, data in data_dict.items():
-        ping_times = data["raw"]["Ping (ms)"].tolist()
-        total_pings = len(ping_times)
-        successful_pings = len([pt for pt in ping_times if pt is not None])
+        ping_series = data["raw"]["Ping (ms)"]
+
+        total_pings = ping_series.size
+        successful_pings = ping_series.count()
         lost_pings = total_pings - successful_pings
         packet_loss = (lost_pings / total_pings) * 100 if total_pings > 0 else 0
-        average_latency = (
-            sum(pt for pt in ping_times if pt is not None) / successful_pings
-            if successful_pings > 0
-            else 0
+
+        if successful_pings > 0:
+            average_latency = ping_series.mean()
+            min_latency = ping_series.min()
+            max_latency = ping_series.max()
+        else:
+            average_latency = "N/A"
+            min_latency = "N/A"
+            max_latency = "N/A"
+
+        # Format latency values
+        average_latency_display = (
+            f"{average_latency:.2f}" if average_latency != "N/A" else "N/A"
         )
-        min_latency = (
-            min(pt for pt in ping_times if pt is not None)
-            if successful_pings > 0
-            else 0
-        )
-        max_latency = (
-            max(pt for pt in ping_times if pt is not None)
-            if successful_pings > 0
-            else 0
-        )
+        min_latency_display = f"{min_latency:.2f}" if min_latency != "N/A" else "N/A"
+        max_latency_display = f"{max_latency:.2f}" if max_latency != "N/A" else "N/A"
 
         table.add_row(
             ip,
             str(total_pings),
             str(successful_pings),
             f"{packet_loss:.2f}%",
-            f"{average_latency:.2f}",
-            str(min_latency),
-            str(max_latency),
+            average_latency_display,
+            min_latency_display,
+            max_latency_display,
         )
 
     console.print(table)
@@ -129,11 +131,9 @@ def aggregate_ping_times(
                 f"Interval {start}-{end}s: Mean Latency = {mean_latency} ms at {midpoint_time}s"
             )
         else:
-            # If all pings in the interval were lost, you can decide how to handle it
+            # If all pings in the interval were lost, assign mean_latency as 0.0
             midpoint_time = start + (interval / 2)
-            aggregated_data.append(
-                (midpoint_time, 0.0)
-            )  # Assuming 0 latency for all lost pings
+            aggregated_data.append((midpoint_time, 0.0))
             logging.warning(
                 f"All pings lost in interval {start}-{end} seconds. Mean Latency set to 0.0 ms at {midpoint_time}s."
             )

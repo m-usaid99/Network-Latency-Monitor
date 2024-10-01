@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-import subprocess
 import sys
 import re
 from rich.progress import Progress
