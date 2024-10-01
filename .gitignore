@@ -2,3 +2,5 @@
 *.png
 *.log
 *.yaml
+
+__pycache__/*
