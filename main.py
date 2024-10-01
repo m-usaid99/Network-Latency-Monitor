@@ -1,5 +1,4 @@
 # main.py
-
 import asyncio
 import sys
 import logging
@@ -31,6 +30,14 @@ from plot_generator import (
 )
 from utils import clear_data
 from typing import Dict
+
+
+# TODO: - Fix the issue regarding nan values in aggregate
+#       - examine packet loss data and see how to incorporate it better
+#       - Turn it into a python package to make it pip installable
+#       - add cross platform compatibility
+#       - Look up how to incorporate real-time graph.
+#       - update documentation to reflect changes
 
 # Initialize Rich Console
 console = Console()
@@ -310,4 +317,3 @@ if __name__ == "__main__":
         console.print("\n[bold red]Ping monitoring interrupted by user.[/bold red]")
         logging.warning("Ping monitoring interrupted by user.")
         sys.exit(0)
-
