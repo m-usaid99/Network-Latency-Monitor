@@ -4,6 +4,9 @@ import os
 import re
 import sys
 from pathlib import Path
+from dataclasses import dataclass, field
+from typing import List, Dict, Tuple, Optional
+
 import matplotlib
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -13,276 +16,364 @@ import yaml
 # Use the Agg backend for matplotlib to improve performance in non-interactive environments
 matplotlib.use("Agg")
 
-# Global configuration
-FIGSIZE = (25, 15)
-AGGREGATION_INTERVAL = 60  # seconds
 
-plt.rcParams.update(
-    {
-        "font.size": 22,
-        "axes.titlesize": 24,
-        "axes.labelsize": 22,
-        "xtick.labelsize": 20,
-        "ytick.labelsize": 20,
-        "legend.fontsize": 20,
-    }
-)
-
-
-def initialize_logging():
-    """
-    Sets up logging using the python logging library. Logs are saved into a file in the logs/ directory for each run.
-    """
-    current_date = pd.Timestamp.now().strftime("%Y-%m-%d_%H-%M-%S")
-    log_file = f"logs/generate_plots_{current_date}.log"
-    logging.basicConfig(
-        filename=log_file,
-        level=logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(message)s",
+@dataclass
+class Config:
+    figsize: Tuple[int, int] = (25, 15)
+    aggregation_interval: int = 60  # seconds
+    plot_dpi: int = 100
+    plot_theme: str = "darkgrid"
+    plot_font_sizes: Dict[str, int] = field(
+        default_factory=lambda: {"title": 24, "label": 22, "tick": 20, "legend": 20}
     )
-    logging.info("Python script started")
+    aggregation_method: str = "mean"
+    segmentation_hourly: bool = True
+    results_folder: str = "results"
+    plots_folder: str = "plots"
+    log_folder: str = "logs"
 
 
-def parse_arguments():
-    """
-    Parses command line arguments passed from the shell script, and added to the parser object.
-    """
-    parser = argparse.ArgumentParser(
-        description="WiFi Ping Monitor - Generate Plots from Ping Results"
-    )
-    parser.add_argument(
-        "results_files", nargs="+", help="Path to the ping results file(s)"
-    )
-    parser.add_argument("plots_folder", help="Directory to save the plots")
-    parser.add_argument(
-        "--no-aggregation", action="store_true", help="Disable data aggregation"
-    )
-    return parser.parse_args()
+class PingPlotGenerator:
+    def __init__(self, config: Config, no_aggregation: bool = False):
+        self.config = config
+        self.no_aggregation = no_aggregation
+        self.setup_logging()
 
-
-def read_config(config_file="config.yaml"):
-    """
-    Reads a config.yaml file and gets different parameters from there.
-
-    :param config_file string: Path to the config file.
-    """
-    try:
-        with open(config_file, "r") as file:
-            config = yaml.safe_load(file)
-        return config
-    except FileNotFoundError:
-        logging.error(f"Configuration file {config_file} not found.")
-        sys.exit(1)
-    except yaml.YAMLError as e:
-        logging.error(f"Error parsing configuration file: {e}")
-        sys.exit(1)
-
-
-def read_ping_results(file_path):
-    """
-    Reads a .txt file containing ping results.
-
-    :param file_path string: File path to the .txt file containing results from the ping command.
-    """
-    logging.info(f"Reading ping results from {file_path}")
-    try:
-        with open(file_path, "r") as file:
-            lines = file.readlines()
-        if not lines:
-            logging.error("Error: Results file is empty.")
-            sys.exit(1)
-        return lines
-    except FileNotFoundError:
-        logging.error(f"Results file {file_path} not found.")
-        sys.exit(1)
-    except Exception as e:
-        logging.error(f"Error reading results file: {e}")
-        sys.exit(1)
-
-
-def extract_ping_data(lines):
-    """
-    Parses a line from the text file, and obtains relevant ping data.
-
-    :param lines string: Each line from the ping results text file.
-    """
-    ping_times = []
-    packet_loss = 0
-
-    try:
-        for line in lines:
-            match = re.search(r"time=(\d+\.?\d*) ms", line)
-            if match:
-                ping_times.append(float(match.group(1)))
-
-            loss_match = re.search(r"(\d+)% packet loss", line)
-            if loss_match:
-                packet_loss = int(loss_match.group(1))
-
-        logging.info(f"Extracted {len(ping_times)} ping times from the results file")
-        logging.info(f"Packet loss: {packet_loss}%")
-    except Exception as e:
-        logging.error(f"Error processing data: {e}")
-        sys.exit(1)
-
-    return ping_times, packet_loss
-
-
-def aggregate_data(ping_times, interval) -> list:
-    """
-    Computes aggregate (mean) ping data over a specified time interval.
-
-    :param ping_times list: A list containing all processed ping data for an IP address.
-    :param interval int: The time interval over which aggregation takes place.
-    """
-    aggregated_data = []
-    num_intervals = len(ping_times) // interval
-
-    for i in range(num_intervals):
-        chunk = ping_times[i * interval : (i + 1) * interval]
-        aggregated_data.append(sum(chunk) / len(chunk))
-
-    remaining_chunk = ping_times[num_intervals * interval :]
-    if remaining_chunk:
-        aggregated_data.append(sum(remaining_chunk) / len(remaining_chunk))
-
-    return aggregated_data
-
-
-def create_plots(
-    ping_data_dict, interval, plots_folder, aggregation_interval, no_aggregation
-):
-    """
-    Uses ping data lists to create plots and save them to a dedicated plot directory.
-
-    :param ping_data_dict dict: A dictionary containing raw data for each ip address.
-    :param interval int: The time interval between each ping attempt.
-    :param plots_folder string: The directory where the plots subdirectory is going to be created.
-    :param aggregation_interval int: The interval over which data aggregation has to take place.
-    :param no_aggregation boolean: A flag to disable aggregation (enabled by default).
-    """
-    sns.set_theme(style="darkgrid")
-    try:
+    def setup_logging(self):
+        """
+        Sets up logging to file and console.
+        """
+        os.makedirs(self.config.log_folder, exist_ok=True)
         current_date = pd.Timestamp.now().strftime("%Y-%m-%d_%H-%M-%S")
-        plot_subfolder = os.path.join(plots_folder, f"plots_{current_date}")
-        os.makedirs(plot_subfolder, exist_ok=True)
+        log_file = Path(self.config.log_folder) / f"generate_plots_{current_date}.log"
 
-        samples_per_hour = 3600 // interval
-        color_palette = sns.color_palette("muted", len(ping_data_dict))
-        colors = {ip: color_palette.pop(0) for ip in ping_data_dict}
+        # Create logger
+        self.logger = logging.getLogger("PingPlotGenerator")
+        self.logger.setLevel(logging.INFO)
 
-        for hour in range(
-            0, max(len(times) for times in ping_data_dict.values()), samples_per_hour
-        ):
-            plt.figure(figsize=FIGSIZE)
+        # File handler
+        fh = logging.FileHandler(log_file)
+        fh.setLevel(logging.INFO)
+
+        # Console handler
+        ch = logging.StreamHandler(sys.stdout)
+        ch.setLevel(logging.INFO)
+
+        # Formatter
+        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+        fh.setFormatter(formatter)
+        ch.setFormatter(formatter)
+
+        # Add handlers
+        self.logger.addHandler(fh)
+        self.logger.addHandler(ch)
+
+        self.logger.info("PingPlotGenerator initialized.")
+
+    def read_config(self, config_file: str = "config.yaml") -> Config:
+        """
+        Reads configuration from a YAML file.
+
+        :param config_file: Path to the configuration file.
+        :return: Config object with settings.
+        """
+        try:
+            with open(config_file, "r") as file:
+                cfg = yaml.safe_load(file)
+            config = Config(
+                figsize=tuple(
+                    cfg.get("plot", {}).get("figure_size", self.config.figsize)
+                ),
+                aggregation_interval=cfg.get("aggregation", {}).get(
+                    "interval", self.config.aggregation_interval
+                ),
+                plot_dpi=cfg.get("plot", {}).get("dpi", self.config.plot_dpi),
+                plot_theme=cfg.get("plot", {}).get("theme", self.config.plot_theme),
+                plot_font_sizes={
+                    "title": cfg.get("plot", {})
+                    .get("font", {})
+                    .get("title_size", self.config.plot_font_sizes["title"]),
+                    "label": cfg.get("plot", {})
+                    .get("font", {})
+                    .get("label_size", self.config.plot_font_sizes["label"]),
+                    "tick": cfg.get("plot", {})
+                    .get("font", {})
+                    .get("tick_size", self.config.plot_font_sizes["tick"]),
+                    "legend": cfg.get("plot", {})
+                    .get("font", {})
+                    .get("legend_size", self.config.plot_font_sizes["legend"]),
+                },
+                aggregation_method=cfg.get("aggregation", {}).get(
+                    "method", self.config.aggregation_method
+                ),
+                segmentation_hourly=cfg.get("segmentation", {}).get(
+                    "hourly", self.config.segmentation_hourly
+                ),
+                results_folder=cfg.get("results_folder", self.config.results_folder),
+                plots_folder=cfg.get("plots_folder", self.config.plots_folder),
+                log_folder=cfg.get("log_folder", self.config.log_folder),
+            )
+            self.logger.info(f"Configuration loaded from {config_file}.")
+            return config
+        except FileNotFoundError:
+            self.logger.error(f"Configuration file {config_file} not found.")
+            sys.exit(1)
+        except yaml.YAMLError as e:
+            self.logger.error(f"Error parsing configuration file: {e}")
+            sys.exit(1)
+
+    def parse_arguments(self) -> argparse.Namespace:
+        """
+        Parses command-line arguments.
+
+        :return: Parsed arguments namespace.
+        """
+        parser = argparse.ArgumentParser(
+            description="WiFi Ping Monitor - Generate Plots from Ping Results"
+        )
+        parser.add_argument(
+            "results_files", nargs="+", help="Path to the ping results file(s)"
+        )
+        parser.add_argument("plots_folder", help="Directory to save the plots")
+        parser.add_argument(
+            "--no-aggregation", action="store_true", help="Disable data aggregation"
+        )
+        return parser.parse_args()
+
+    def read_ping_results(self, file_path: str) -> List[str]:
+        """
+        Reads a .txt file containing ping results.
+
+        :param file_path: Path to the .txt file containing results from the ping command.
+        :return: List of lines from the file.
+        """
+        self.logger.info(f"Reading ping results from {file_path}")
+        try:
+            with open(file_path, "r") as file:
+                lines = file.readlines()
+            if not lines:
+                self.logger.error(f"Results file {file_path} is empty.")
+                sys.exit(1)
+            return lines
+        except FileNotFoundError:
+            self.logger.error(f"Results file {file_path} not found.")
+            sys.exit(1)
+        except Exception as e:
+            self.logger.error(f"Error reading results file {file_path}: {e}")
+            sys.exit(1)
+
+    def extract_ping_data(self, lines: List[str]) -> Tuple[List[float], int]:
+        """
+        Parses lines from the ping results to extract ping times and packet loss.
+
+        :param lines: List of lines from the ping results file.
+        :return: Tuple containing list of ping times and packet loss percentage.
+        """
+        ping_times = []
+        packet_loss = 0
+
+        try:
+            for line in lines:
+                time_match = re.search(r"time=(\d+\.?\d*) ms", line)
+                if time_match:
+                    ping_times.append(float(time_match.group(1)))
+
+                loss_match = re.search(r"(\d+)% packet loss", line)
+                if loss_match:
+                    packet_loss = int(loss_match.group(1))
+
+            self.logger.info(f"Extracted {len(ping_times)} ping times.")
+            self.logger.info(f"Packet loss: {packet_loss}%")
+        except Exception as e:
+            self.logger.error(f"Error processing ping data: {e}")
+            sys.exit(1)
+
+        return ping_times, packet_loss
+
+    def aggregate_data(self, ping_times: List[float]) -> List[float]:
+        """
+        Aggregates ping times using the specified method over the aggregation interval.
+
+        :param ping_times: List of ping times.
+        :return: Aggregated ping times.
+        """
+        if self.config.aggregation_method == "mean":
+            aggregation_func = pd.Series.mean
+        elif self.config.aggregation_method == "median":
+            aggregation_func = pd.Series.median
+        elif self.config.aggregation_method == "min":
+            aggregation_func = pd.Series.min
+        elif self.config.aggregation_method == "max":
+            aggregation_func = pd.Series.max
+        else:
+            self.logger.warning(
+                f"Unknown aggregation method '{self.config.aggregation_method}'. Using mean."
+            )
+            aggregation_func = pd.Series.mean
+
+        try:
+            series = pd.Series(ping_times)
+            aggregated = (
+                series.resample(f"{self.config.aggregation_interval}S", origin="start")
+                .apply(aggregation_func)
+                .tolist()
+            )
+            self.logger.info(f"Aggregated data using {self.config.aggregation_method}.")
+            return aggregated
+        except Exception as e:
+            self.logger.error(f"Error during data aggregation: {e}")
+            sys.exit(1)
+
+    def create_plots(
+        self,
+        ping_data_dict: Dict[str, List[float]],
+        interval: int,
+        plots_folder: str,
+    ):
+        """
+        Generates and saves plots based on the ping data.
+
+        :param ping_data_dict: Dictionary with IP addresses as keys and list of ping times as values.
+        :param interval: Interval between each ping in seconds.
+        :param plots_folder: Directory to save the plots.
+        """
+        sns.set_theme(style=self.config.plot_theme)
+        plt.rcParams.update(
+            {
+                "font.size": self.config.plot_font_sizes["label"],
+                "axes.titlesize": self.config.plot_font_sizes["title"],
+                "axes.labelsize": self.config.plot_font_sizes["label"],
+                "xtick.labelsize": self.config.plot_font_sizes["tick"],
+                "ytick.labelsize": self.config.plot_font_sizes["tick"],
+                "legend.fontsize": self.config.plot_font_sizes["legend"],
+            }
+        )
+
+        try:
+            current_date = pd.Timestamp.now().strftime("%Y-%m-%d_%H-%M-%S")
+            plot_subfolder = Path(plots_folder) / f"plots_{current_date}"
+            plot_subfolder.mkdir(parents=True, exist_ok=True)
+            self.logger.info(f"Plots will be saved to {plot_subfolder}")
+
+            samples_per_aggregation = self.config.aggregation_interval // interval
+            color_palette = sns.color_palette("muted", len(ping_data_dict))
+            colors = {
+                ip: color_palette[i] for i, ip in enumerate(ping_data_dict.keys())
+            }
+
             for ip, ping_times in ping_data_dict.items():
-                color = colors[ip]
-                start_idx = hour
-                end_idx = hour + samples_per_hour
-                time_stamps = [
-                    i * interval
-                    for i in range(start_idx, min(end_idx, len(ping_times)))
-                ]
+                self.logger.info(f"Generating plot for IP: {ip}")
+                time_stamps = [i * interval for i in range(len(ping_times))]
 
-                df_hourly = pd.DataFrame(
-                    {
-                        "Time (s)": time_stamps,
-                        "Ping (ms)": ping_times[start_idx:end_idx],
-                    }
-                )
+                df = pd.DataFrame({"Time (s)": time_stamps, "Ping (ms)": ping_times})
+
+                plt.figure(figsize=self.config.figsize)
                 sns.lineplot(
                     x="Time (s)",
                     y="Ping (ms)",
-                    data=df_hourly,
-                    label=f"Raw Data ({ip})",
-                    color=color,
+                    data=df,
+                    label="Raw Data",
+                    color=colors[ip],
                 )
 
-                if not no_aggregation and len(ping_times) > 60:
-                    aggregated_data = aggregate_data(
-                        ping_times[start_idx:end_idx], aggregation_interval
-                    )
-                    agg_time_stamps = [
-                        (i * aggregation_interval)
-                        + (aggregation_interval // 2)
-                        + start_idx
-                        for i in range(len(aggregated_data))
-                    ]
-                    df_agg = pd.DataFrame(
-                        {
-                            "Time (s)": agg_time_stamps,
-                            "Ping (ms)": aggregated_data,
-                        }
+                if (
+                    not self.no_aggregation
+                    and len(ping_times) >= self.config.aggregation_interval
+                ):
+                    df["Time"] = pd.to_datetime(df["Time (s)"], unit="s")
+                    df.set_index("Time (s)", inplace=True)
+                    df_agg = (
+                        df.resample(f"{self.config.aggregation_interval}S")
+                        .agg({"Ping (ms)": self.config.aggregation_method})
+                        .reset_index()
                     )
                     sns.lineplot(
                         x="Time (s)",
                         y="Ping (ms)",
                         data=df_agg,
-                        label=f"Aggregated Data ({ip})",
-                        linestyle="dotted",
+                        label=f"Aggregated ({self.config.aggregation_method})",
+                        linestyle="--",
                         marker="o",
-                        color=color,
+                        color=colors[ip],
                     )
 
-            plt.title(
-                f"WiFi Network Ping Over Time ({hour // 3600 + 1} Hour{'s' if hour // 3600 + 1 > 1 else ''}, Max Value Capped at 600 ms)"
-            )
-            plt.xlabel("Time (seconds)")
-            plt.ylabel("Ping (ms)")
-            plt.legend()
-            plt.xticks(
-                range(
-                    start_idx,
-                    min(end_idx, len(ping_times)),
-                    max(1, samples_per_hour // 10),
-                )
-            )
-            plot_path = os.path.join(
-                plot_subfolder, f"wifi_ping_plot_hour_{hour // 3600 + 1}.png"
-            )
-            plt.savefig(plot_path)
-            plt.close()
-            logging.info(f"Generated plot for Hour {hour // 3600 + 1}: {plot_path}")
+                plt.title(f"WiFi Network Ping Over Time - {ip}")
+                plt.xlabel("Time (seconds)")
+                plt.ylabel("Ping (ms)")
+                plt.legend()
+                plt.tight_layout()
 
-    except Exception as e:
-        logging.error(f"Error generating plots: {e}")
-        sys.exit(1)
+                plot_path = plot_subfolder / f"wifi_ping_plot_{ip}.png"
+                plt.savefig(plot_path, dpi=self.config.plot_dpi)
+                plt.close()
+                self.logger.info(f"Plot saved: {plot_path}")
+
+        except Exception as e:
+            self.logger.error(f"Error generating plots: {e}")
+            sys.exit(1)
+
+    def report_packet_loss(self, ping_data_dict: Dict[str, List[float]]):
+        """
+        Logs and prints the total packet loss for each IP address.
+
+        :param ping_data_dict: Dictionary with IP addresses as keys and list of ping times as values.
+        """
+        for ip, ping_times in ping_data_dict.items():
+            # Assuming that a ping time of 0 indicates packet loss
+            lost_packets = ping_times.count(0)
+            total_pings = len(ping_times)
+            packet_loss_percent = (
+                (lost_packets / total_pings) * 100 if total_pings > 0 else 0
+            )
+            self.logger.info(f"Total Packet Loss for {ip}: {packet_loss_percent:.2f}%")
+            print(f"Total Packet Loss for {ip}: {packet_loss_percent:.2f}%")
+
+    def run(self):
+        """
+        Main execution method.
+        """
+        args = self.parse_arguments()
+        self.no_aggregation = args.no_aggregation or self.no_aggregation
+
+        # Update plots_folder from arguments
+        self.config.plots_folder = args.plots_folder
+
+        # Read configuration
+        config = self.read_config()
+
+        # Override aggregation setting if command-line flag is set
+        self.no_aggregation = args.no_aggregation or self.no_aggregation
+
+        self.logger.info(
+            f"Arguments received: results_files={args.results_files}, "
+            f"plots_folder={args.plots_folder}, no_aggregation={self.no_aggregation}"
+        )
+
+        ping_data_dict = {}
+        for results_file in args.results_files:
+            lines = self.read_ping_results(results_file)
+            ping_times, packet_loss = self.extract_ping_data(lines)
+            ip = Path(results_file).stem.split("_")[2]
+            ping_data_dict[ip] = ping_times
+
+        self.create_plots(
+            ping_data_dict,
+            config.aggregation_interval,
+            self.config.plots_folder,
+        )
+
+        self.report_packet_loss(ping_data_dict)
+        self.logger.info("PingPlotGenerator completed successfully.")
 
 
 def main():
-    initialize_logging()
-    args = parse_arguments()
-    config = read_config()
-
-    logging.info(
-        f"Arguments received: results_files={args.results_files}, plots_folder={args.plots_folder}, no_aggregation={args.no_aggregation}"
-    )
-
-    global FIGSIZE, AGGREGATION_INTERVAL
-    FIGSIZE = tuple(config["plot"]["figure_size"])
-    AGGREGATION_INTERVAL = config["aggregation"]["interval"]
-
-    ping_data_dict = {}
-    for results_file in args.results_files:
-        lines = read_ping_results(results_file)
-        ping_times, packet_loss = extract_ping_data(lines)
-        ip = Path(results_file).stem.split("_")[2]
-        ping_data_dict[ip] = ping_times
-
-    create_plots(
-        ping_data_dict,
-        config["ping_interval"],
-        args.plots_folder,
-        AGGREGATION_INTERVAL,
-        args.no_aggregation,
-    )
-
-    for ip, ping_times in ping_data_dict.items():
-        logging.info(f"Total Packet Loss for {ip}: {ping_times.count(0)}%")
-        print(f"Total Packet Loss for {ip}: {ping_times.count(0)}%")
-
-    logging.info("Python script completed")
+    # Initialize default config
+    default_config = Config()
+    # Initialize generator with default config
+    generator = PingPlotGenerator(config=default_config)
+    generator.run()
 
 
 if __name__ == "__main__":
     main()
+
