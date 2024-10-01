@@ -10,18 +10,17 @@ from datetime import datetime
 from cli import parse_arguments
 from config import load_config
 from logger import setup_logging
-from ping_manager import run_ping  # Ensure this function is defined correctly
+from ping_manager import run_ping  # Ensure this is correctly implemented
 from rich.console import Console
 from rich.prompt import Prompt
 from rich.progress import (
     Progress,
     SpinnerColumn,
-    BarColumn,
     TextColumn,
+    BarColumn,
     TimeElapsedColumn,
     TimeRemainingColumn,
 )
-from rich.text import Text
 
 from plot_generator import (
     extract_ping_times,
@@ -54,7 +53,7 @@ def ask_confirmation(message: str, auto_confirm: bool) -> bool:
 
 async def run_pings_with_progress(args, config, results_subfolder):
     """
-    Executes ping tasks and displays a rich progress bar.
+    Executes ping tasks with separate progress bars for each IP.
 
     :param args: Parsed command-line arguments.
     :param config: Configuration dictionary.
@@ -62,49 +61,45 @@ async def run_pings_with_progress(args, config, results_subfolder):
     """
     duration = args.duration
     ping_interval = args.ping_interval
-
+    ips = args.ip_addresses
     tasks = []
-    for ip in args.ip_addresses:
-        results_file = os.path.join(results_subfolder, f"ping_results_{ip}.txt")
-        task = asyncio.create_task(
-            run_ping(
-                ip_address=ip,
-                duration=duration,
-                interval=ping_interval,
-                results_file=results_file,
-            )
-        )
-        tasks.append(task)
 
     with Progress(
         SpinnerColumn(),
-        TextColumn("[bold blue]{task.description}"),  # Updated line
+        TextColumn("[bold blue]{task.description}"),
         BarColumn(),
         "[progress.percentage]{task.percentage:>3.1f}%",
         TimeElapsedColumn(),
         TimeRemainingColumn(),
         console=console,
-        transient=True,
+        transient=False,
     ) as progress:
-        ping_task = progress.add_task("[cyan]Pinging...", total=duration)
+        for ip in ips:
+            results_file = os.path.join(results_subfolder, f"ping_results_{ip}.txt")
+            # Initialize each progress bar with a unique task
+            task_id = progress.add_task(f"[cyan]{ip} - Initializing...", total=duration)
+            task = asyncio.create_task(
+                run_ping(
+                    ip_address=ip,
+                    duration=duration,
+                    interval=ping_interval,
+                    results_file=results_file,
+                    progress=progress,
+                    task_id=task_id,
+                )
+            )
+            tasks.append(task)
 
-        async def update_progress():
-            start_time = time.time()
-            while not progress.finished:
-                elapsed = int(time.time() - start_time)
-                progress.update(ping_task, completed=elapsed)
-                if elapsed >= duration:
-                    progress.stop()
-                    break
-                await asyncio.sleep(1)
-
-        await asyncio.gather(asyncio.gather(*tasks), update_progress())
+        await asyncio.gather(*tasks)
 
 
 async def main():
+    # Parse command-line arguments
     args = parse_arguments()
+    # Load configuration
     config = load_config()
-    setup_logging(config.get("log_folder", "logs"))  # Initialize logging
+    # Setup logging (logs are written to files only)
+    setup_logging(config.get("log_folder", "logs"))
 
     logging.info("Configuration and arguments loaded.")
     logging.info(f"Configuration: {config}")
@@ -112,7 +107,7 @@ async def main():
 
     # Handle clear operations if any
     if args.clear or args.clear_plots or args.clear_results or args.clear_logs:
-        # Build a list of folders to clear based on arguments
+        # Determine which folders to clear based on arguments
         folders_to_clear = []
         if args.clear:
             folders_to_clear = [
@@ -136,11 +131,11 @@ async def main():
             if ask_confirmation(confirmation_message, args.yes):
                 clear_data(args, config)
                 console.print(
-                    "[green]Selected data has been cleared successfully.[/green]"
+                    "[bold green]Selected data has been cleared successfully.[/bold green]"
                 )
                 logging.info("Clear operation completed.")
             else:
-                console.print("[yellow]Clear operation canceled.[/yellow]")
+                console.print("[bold yellow]Clear operation canceled.[/bold yellow]")
                 logging.info("Clear operation canceled by user.")
             return  # Exit after clearing
 
@@ -160,7 +155,7 @@ async def main():
         logging.info("Processing of ping file completed.")
         return
 
-    # Determine IP addresses
+    # Determine IP addresses; use default if none provided
     if not args.ip_addresses:
         default_ip = config.get("ip_address", "8.8.8.8")
         args.ip_addresses = [default_ip]
@@ -179,13 +174,13 @@ async def main():
     )
     logging.info(f"Created results subdirectory: {results_subfolder}")
 
-    # Run pings with progress tracking
+    # Start ping monitoring with enhanced progress bars
     console.print("[bold blue]Starting ping monitoring...[/bold blue]")
     await run_pings_with_progress(args, config, results_subfolder)
     console.print("[bold green]Ping monitoring completed.[/bold green]")
     logging.info("All ping tasks completed.")
 
-    # After pinging, read all result files in the subdirectory and build data_dict
+    # Process ping results
     data_dict = {}
     ip_files = [
         f
@@ -195,7 +190,7 @@ async def main():
 
     for file_name in ip_files:
         file_path = os.path.join(results_subfolder, file_name)
-        # Correct IP parsing without splitting on '.'
+        # Extract IP address from filename
         ip_address = file_name[len("ping_results_") : -len(".txt")]
         ping_times = extract_ping_times(file_path)
         if not ping_times:
@@ -233,7 +228,7 @@ async def main():
         # Store data
         data_dict[ip_address] = {"raw": raw_df, "aggregated": agg_df}
 
-    # Generate plots
+    # Generate plots if data is available
     if data_dict:
         console.print("[bold blue]Generating plots...[/bold blue]")
         generate_plots(config=config, data_dict=data_dict)
