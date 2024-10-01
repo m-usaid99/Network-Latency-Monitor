@@ -1,6 +1,5 @@
 # plot_generator.py
 
-import re
 import logging
 import os
 import matplotlib.pyplot as plt
@@ -105,13 +104,13 @@ def display_summary(data_dict: dict) -> None:
 
 def aggregate_ping_times(
     ping_times: List[Optional[float]], interval: int
-) -> List[Tuple[int, float]]:
+) -> List[Tuple[float, float]]:
     """
-    Aggregates ping times over specified intervals.
+    Aggregates ping times over specified intervals and assigns aggregate points at the midpoint of each interval.
 
     :param ping_times: List of ping times where None represents a lost ping.
     :param interval: Interval in seconds to aggregate pings.
-    :return: List of tuples containing (Time Interval, Mean Latency)
+    :return: List of tuples containing (Midpoint Time Interval, Mean Latency)
     """
     aggregated_data = []
     total_intervals = len(ping_times) // interval
@@ -124,14 +123,37 @@ def aggregate_ping_times(
         successful_pings = [pt for pt in interval_pings if pt is not None]
         if successful_pings:
             mean_latency = sum(successful_pings) / len(successful_pings)
-            aggregated_data.append((i * interval, mean_latency))
+            midpoint_time = start + (interval / 2)
+            aggregated_data.append((midpoint_time, mean_latency))
+            logging.debug(
+                f"Interval {start}-{end}s: Mean Latency = {mean_latency} ms at {midpoint_time}s"
+            )
         else:
             # If all pings in the interval were lost, you can decide how to handle it
+            midpoint_time = start + (interval / 2)
             aggregated_data.append(
-                (i * interval, 0.0)
+                (midpoint_time, 0.0)
             )  # Assuming 0 latency for all lost pings
             logging.warning(
-                f"All pings lost in interval {i * interval} to {end} seconds."
+                f"All pings lost in interval {start}-{end} seconds. Mean Latency set to 0.0 ms at {midpoint_time}s."
+            )
+
+    # Handle any remaining pings that don't complete a full interval
+    remaining_pings = ping_times[total_intervals * interval :]
+    if remaining_pings:
+        successful_pings = [pt for pt in remaining_pings if pt is not None]
+        if successful_pings:
+            mean_latency = sum(successful_pings) / len(successful_pings)
+            midpoint_time = total_intervals * interval + (len(remaining_pings) / 2)
+            aggregated_data.append((midpoint_time, mean_latency))
+            logging.debug(
+                f"Remaining Interval {total_intervals * interval}-{total_intervals * interval + len(remaining_pings)}s: Mean Latency = {mean_latency} ms at {midpoint_time}s"
+            )
+        else:
+            midpoint_time = total_intervals * interval + (len(remaining_pings) / 2)
+            aggregated_data.append((midpoint_time, 0.0))
+            logging.warning(
+                f"All pings lost in remaining interval {total_intervals * interval}-{total_intervals * interval + len(remaining_pings)} seconds. Mean Latency set to 0.0 ms at {midpoint_time}s."
             )
 
     return aggregated_data

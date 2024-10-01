@@ -30,6 +30,7 @@ from plot_generator import (
     display_summary,
 )
 from utils import clear_data
+from typing import Dict
 
 # Initialize Rich Console
 console = Console()
@@ -46,9 +47,112 @@ def ask_confirmation(message: str, auto_confirm: bool) -> bool:
     return response.lower() in ["y", "yes"]
 
 
-async def run_pings_with_progress(args, config, results_subfolder):
+def handle_clear_operations(args, config):
     """
-    Executes ping tasks with separate progress bars for each IP.
+    Handles data clearing operations based on command-line arguments.
+    """
+    folders_to_clear = []
+    confirmation_message = ""
+
+    if args.clear:
+        folders_to_clear = [
+            config.get("results_folder", "results"),
+            config.get("plots_folder", "plots"),
+            config.get("log_folder", "logs"),
+        ]
+        confirmation_message = (
+            "Are you sure you want to clear ALL data (results, plots, logs)?"
+        )
+    else:
+        if args.clear_results:
+            folders_to_clear.append(config.get("results_folder", "results"))
+        if args.clear_plots:
+            folders_to_clear.append(config.get("plots_folder", "plots"))
+        if args.clear_logs:
+            folders_to_clear.append(config.get("log_folder", "logs"))
+        confirmation_message = "Are you sure you want to clear the selected data?"
+
+    if folders_to_clear:
+        if ask_confirmation(confirmation_message, args.yes):
+            clear_data(args, config)
+            console.print(
+                "[bold green]Selected data has been cleared successfully.[/bold green]"
+            )
+            logging.info("Clear operation completed.")
+        else:
+            console.print("[bold yellow]Clear operation canceled.[/bold yellow]")
+            logging.info("Clear operation canceled by user.")
+        sys.exit(0)  # Exit after clearing
+
+
+def process_file_mode(args, config):
+    """
+    Processes the ping result file if file mode is enabled.
+    """
+    if args.file:
+        console.print(
+            f"[bold green]Processing ping result file:[/bold green] {args.file}"
+        )
+        logging.info(f"Processing ping result file: {args.file}")
+        process_ping_file(
+            file_path=args.file,
+            config=config,
+            no_aggregation=args.no_aggregation,
+            duration=args.duration,
+        )
+        console.print("[bold green]Processing of ping file completed.[/bold green]")
+        logging.info("Processing of ping file completed.")
+        sys.exit(0)  # Exit after processing file
+
+
+def validate_and_get_ips(args, config) -> list:
+    """
+    Validates the list of IP addresses and returns the validated list.
+    """
+    ips = args.ip_addresses or [config.get("ip_address", "8.8.8.8")]
+
+    if not args.ip_addresses:
+        default_ip = config.get("ip_address", "8.8.8.8")
+        console.print(
+            f"[bold yellow]No IP addresses provided. Using default IP:[/bold yellow] {default_ip}"
+        )
+        logging.info(f"No IP addresses provided. Using default IP: {default_ip}")
+
+    validated_ips = []
+    for ip in ips:
+        try:
+            ipaddress.ip_address(ip)
+            validated_ips.append(ip)
+        except ValueError:
+            console.print(f"[bold red]Invalid IP address:[/bold red] {ip}")
+            logging.error(f"Invalid IP address provided: {ip}")
+
+    if not validated_ips:
+        console.print("[bold red]No valid IP addresses provided. Exiting.[/bold red]")
+        logging.error("No valid IP addresses provided. Exiting.")
+        sys.exit(1)
+
+    return validated_ips
+
+
+def create_results_directory(config) -> str:
+    """
+    Creates a results subdirectory with a timestamp and returns its path.
+    """
+    results_folder = config.get("results_folder", "results")
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    results_subfolder = os.path.join(results_folder, f"results_{timestamp}")
+    os.makedirs(results_subfolder, exist_ok=True)
+    console.print(
+        f"[bold green]Created results subdirectory:[/bold green] {results_subfolder}"
+    )
+    logging.info(f"Created results subdirectory: {results_subfolder}")
+    return results_subfolder
+
+
+async def run_ping_monitoring(args, config, results_subfolder):
+    """
+    Initiates ping monitoring with progress bars.
     """
     duration = args.duration
     ping_interval = args.ping_interval
@@ -68,7 +172,7 @@ async def run_pings_with_progress(args, config, results_subfolder):
         for ip in ips:
             results_file = os.path.join(results_subfolder, f"ping_results_{ip}.txt")
             # Initialize each progress bar with a unique task
-            task_id = progress.add_task(f"[cyan]{ip} - Initializing...", total=duration)
+            task_id = progress.add_task(f"[cyan]{ip}", total=duration)
             task = asyncio.create_task(
                 run_ping(
                     ip_address=ip,
@@ -84,117 +188,10 @@ async def run_pings_with_progress(args, config, results_subfolder):
         await asyncio.gather(*tasks)
 
 
-def validate_ips(ips: list) -> list:
+def process_ping_results(results_subfolder, args) -> Dict[str, Dict[str, pd.DataFrame]]:
     """
-    Validates the list of IP addresses.
+    Processes ping results and returns a data dictionary.
     """
-    validated_ips = []
-    for ip in ips:
-        try:
-            ipaddress.ip_address(ip)
-            validated_ips.append(ip)
-        except ValueError:
-            console.print(f"[bold red]Invalid IP address:[/bold red] {ip}")
-            logging.error(f"Invalid IP address provided: {ip}")
-
-    if not validated_ips:
-        console.print("[bold red]No valid IP addresses provided. Exiting.[/bold red]")
-        logging.error("No valid IP addresses provided. Exiting.")
-        sys.exit(1)
-
-    return validated_ips
-
-
-async def main():
-    # Parse command-line arguments
-    args = parse_arguments()
-    # Load configuration
-    config = load_config()
-    # Setup logging (logs are written to files only)
-    setup_logging(config.get("log_folder", "logs"))
-
-    logging.info("Configuration and arguments loaded.")
-    logging.info(f"Configuration: {config}")
-    logging.info(f"Arguments: {args}")
-
-    # Handle clear operations if any
-    if args.clear or args.clear_plots or args.clear_results or args.clear_logs:
-        folders_to_clear = []
-        if args.clear:
-            folders_to_clear = [
-                config.get("results_folder", "results"),
-                config.get("plots_folder", "plots"),
-                config.get("log_folder", "logs"),
-            ]
-            confirmation_message = (
-                "Are you sure you want to clear ALL data (results, plots, logs)?"
-            )
-        else:
-            if args.clear_results:
-                folders_to_clear.append(config.get("results_folder", "results"))
-            if args.clear_plots:
-                folders_to_clear.append(config.get("plots_folder", "plots"))
-            if args.clear_logs:
-                folders_to_clear.append(config.get("log_folder", "logs"))
-            confirmation_message = "Are you sure you want to clear the selected data?"
-
-        if folders_to_clear:
-            if ask_confirmation(confirmation_message, args.yes):
-                clear_data(args, config)
-                console.print(
-                    "[bold green]Selected data has been cleared successfully.[/bold green]"
-                )
-                logging.info("Clear operation completed.")
-            else:
-                console.print("[bold yellow]Clear operation canceled.[/bold yellow]")
-                logging.info("Clear operation canceled by user.")
-            return  # Exit after clearing
-
-    # If file mode is enabled, process the file directly
-    if args.file:
-        console.print(
-            f"[bold green]Processing ping result file:[/bold green] {args.file}"
-        )
-        logging.info(f"Processing ping result file: {args.file}")
-        process_ping_file(
-            file_path=args.file,
-            config=config,
-            no_aggregation=args.no_aggregation,
-            duration=args.duration,
-        )
-        console.print("[bold green]Processing of ping file completed.[/bold green]")
-        logging.info("Processing of ping file completed.")
-        return
-
-    # Determine IP addresses; use default if none provided
-    if not args.ip_addresses:
-        default_ip = config.get("ip_address", "8.8.8.8")
-        args.ip_addresses = [default_ip]
-        console.print(
-            f"[bold yellow]No IP addresses provided. Using default IP:[/bold yellow] {default_ip}"
-        )
-        logging.info(f"No IP addresses provided. Using default IP: {default_ip}")
-
-    # Validate IP addresses
-    args.ip_addresses = validate_ips(args.ip_addresses)
-
-    # Create results subdirectory with timestamp
-    results_folder = config.get("results_folder", "results")
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    results_subfolder = os.path.join(results_folder, f"results_{timestamp}")
-    os.makedirs(results_subfolder, exist_ok=True)
-    console.print(
-        f"[bold green]Created results subdirectory:[/bold green] {results_subfolder}"
-    )
-    logging.info(f"Created results subdirectory: {results_subfolder}")
-
-    # Start ping monitoring with enhanced progress bars
-    console.print("[bold blue]Starting ping monitoring...[/bold blue]")
-    await run_pings_with_progress(args, config, results_subfolder)
-    console.print("[bold green]Ping monitoring completed.[/bold green]")
-    logging.info("All ping tasks completed.")
-
-    # Process ping results
     data_dict = {}
     ip_files = [
         f
@@ -227,7 +224,6 @@ async def main():
             aggregate = not args.no_aggregation
 
         if aggregate:
-            # Option 1: Modify aggregate_ping_times to accept List[Optional[float]]
             aggregated_data = aggregate_ping_times(ping_times, interval=60)
             agg_df = pd.DataFrame(
                 aggregated_data, columns=["Time (s)", "Mean Latency (ms)"]
@@ -243,6 +239,13 @@ async def main():
         # Store data
         data_dict[ip_address] = {"raw": raw_df, "aggregated": agg_df}
 
+    return data_dict
+
+
+def display_plots_and_summary(data_dict, config):
+    """
+    Generates plots and displays summary statistics if data is available.
+    """
     # Generate plots if data is available
     if data_dict:
         console.print("[bold blue]Generating plots...[/bold blue]")
@@ -261,6 +264,43 @@ async def main():
     else:
         console.print("[bold red]No data available for summary statistics.[/bold red]")
         logging.warning("No data available for summary statistics.")
+
+
+async def main():
+    # Parse command-line arguments
+    args = parse_arguments()
+    # Load configuration
+    config = load_config()
+    # Setup logging (logs are written to files only)
+    setup_logging(config.get("log_folder", "logs"))
+
+    logging.info("Configuration and arguments loaded.")
+    logging.info(f"Configuration: {config}")
+    logging.info(f"Arguments: {args}")
+
+    # Handle clear operations if any
+    handle_clear_operations(args, config)
+
+    # If file mode is enabled, process the file directly
+    process_file_mode(args, config)
+
+    # Validate IP addresses
+    args.ip_addresses = validate_and_get_ips(args, config)
+
+    # Create results subdirectory with timestamp
+    results_subfolder = create_results_directory(config)
+
+    # Start ping monitoring with enhanced progress bars
+    console.print("[bold blue]Starting ping monitoring...[/bold blue]")
+    await run_ping_monitoring(args, config, results_subfolder)
+    console.print("[bold green]Ping monitoring completed.[/bold green]")
+    logging.info("All ping tasks completed.")
+
+    # Process ping results
+    data_dict = process_ping_results(results_subfolder, args)
+
+    # Generate plots and display summary statistics
+    display_plots_and_summary(data_dict, config)
 
 
 if __name__ == "__main__":
