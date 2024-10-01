@@ -4,7 +4,7 @@ import asyncio
 import logging
 import sys
 import re
-from rich.progress import Progress
+from rich.progress import Progress, TaskID
 
 
 async def run_ping(
@@ -13,35 +13,30 @@ async def run_ping(
     interval: int,
     results_file: str,
     progress: Progress,
-    task_id: int,
+    task_id: TaskID,  # Updated type annotation
 ):
-    """
-    Asynchronously pings an IP address, extracts latency, and updates the progress bar.
+    loop = asyncio.get_event_loop()
+    start_time = loop.time()
+    end_time = start_time + duration
+    last_update_time = start_time
 
-    :param ip_address: IP address to ping.
-    :param duration: Total duration to run the ping in seconds.
-    :param interval: Interval between pings in seconds.
-    :param results_file: File path to save ping results.
-    :param progress: Rich Progress instance for updating the progress bar.
-    :param task_id: Task ID associated with the progress bar.
-    """
-    end_time = asyncio.get_event_loop().time() + duration
-
-    # Determine the ping command based on the operating system
     if sys.platform.startswith("win"):
         ping_cmd = ["ping", "-n", "1", "-w", str(interval * 1000), ip_address]
-    else:
-        ping_cmd = ["ping", "-c", "1", "-W", str(interval), ip_address]
-
-    # Regular expression to extract latency
-    if sys.platform.startswith("win"):
-        # Example output line: "Reply from 8.8.8.8: bytes=32 time=14ms TTL=117"
         latency_regex = re.compile(r"time[=<]\s*(\d+\.?\d*)ms")
     else:
-        # Example output line: "64 bytes from 8.8.8.8: icmp_seq=1 ttl=117 time=14.2 ms"
+        ping_cmd = ["ping", "-c", "1", "-W", str(interval), ip_address]
         latency_regex = re.compile(r"time\s*=\s*(\d+\.?\d*)\s*ms")
 
-    while asyncio.get_event_loop().time() < end_time:
+    while True:
+        current_time = loop.time()
+        if current_time >= end_time:
+            break
+
+        iteration_start_time = current_time
+
+        # Initialize current_latency to None at the start of each iteration
+        current_latency = None
+
         try:
             # Execute the ping command
             proc = await asyncio.create_subprocess_exec(
@@ -63,27 +58,13 @@ async def run_ping(
                 if match:
                     current_latency = float(match.group(1))
                 else:
-                    # If latency not found, assume packet loss or unknown latency
                     current_latency = None
                     logging.warning(
                         f"Could not parse latency from ping output for {ip_address}. Output: {raw_output}"
                     )
             else:
-                # Non-zero return code indicates an error or packet loss
                 current_latency = None
                 logging.error(f"Ping failed for {ip_address}. Error: {error_output}")
-
-            # Update progress bar
-            if current_latency is not None:
-                # Cap latency at 800 ms for display purposes
-                display_latency = min(current_latency, 800.0)
-                description = f"[cyan]{ip_address} - {display_latency} ms"
-                progress.update(task_id, advance=interval, description=description)
-                logging.info(f"Ping to {ip_address}: {current_latency} ms")
-            else:
-                description = f"[cyan]{ip_address} - Lost"
-                progress.update(task_id, advance=interval, description=description)
-                logging.warning(f"Ping to {ip_address} lost or latency not measurable.")
 
             # Write the result to the file
             with open(results_file, "a") as f:
@@ -94,10 +75,46 @@ async def run_ping(
 
         except Exception as e:
             logging.error(f"Exception occurred while pinging {ip_address}: {e}")
-            progress.update(
-                task_id, advance=interval, description=f"[cyan]{ip_address} - Error"
-            )
+            current_latency = None  # Ensure current_latency is defined
+            # Write the error to the file
             with open(results_file, "a") as f:
                 f.write(f"Error: {e}\n")
 
-        await asyncio.sleep(interval)
+        finally:
+            # Update progress bar based on actual elapsed time
+            current_time = loop.time()
+            elapsed_since_last_update = current_time - last_update_time
+            last_update_time = current_time
+
+            if current_latency is not None:
+                display_latency = min(current_latency, 800.0)
+                description = f"[cyan]{ip_address} - {display_latency} ms"
+                progress.update(
+                    task_id,
+                    advance=elapsed_since_last_update,
+                    description=description,
+                )
+                logging.info(f"Ping to {ip_address}: {current_latency} ms")
+            else:
+                description = f"[cyan]{ip_address} - Lost"
+                progress.update(
+                    task_id,
+                    advance=elapsed_since_last_update,
+                    description=description,
+                )
+                logging.warning(f"Ping to {ip_address} lost or latency not measurable.")
+
+        # Calculate time until next ping
+        iteration_end_time = loop.time()
+        time_taken = iteration_end_time - iteration_start_time
+        sleep_time = interval - time_taken
+        if sleep_time > 0:
+            await asyncio.sleep(sleep_time)
+        else:
+            logging.warning(
+                f"Ping execution took longer than interval for {ip_address}."
+            )
+
+    # Ensure the progress bar reaches 100%
+    progress.update(task_id, completed=duration)
+
