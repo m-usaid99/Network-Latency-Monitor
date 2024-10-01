@@ -232,7 +232,7 @@ def generate_plots(config: dict, data_dict: Dict[str, Dict[str, pd.DataFrame]]) 
 
     # Customize plot
     plt.title(
-        f"WiFi Network Ping Over Time",
+        "WiFi Network Ping Over Time",
         fontsize=config["plot"]["font"].get("title_size", 24),
     )
     plt.xlabel("Time (seconds)", fontsize=config["plot"]["font"].get("label_size", 22))

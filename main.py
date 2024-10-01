@@ -36,10 +36,8 @@ from typing import Dict
 #       - Turn it into a python package to make it pip installable
 #       - add cross platform compatibility
 #       - Look up how to incorporate real-time graph.
+#       - add more config options
 #       - update documentation to reflect changes
-#
-# FIX: - nan values in aggregate
-#      - fix progress bar 100% completion issue
 
 # Initialize Rich Console
 console = Console()
