@@ -1,4 +1,5 @@
 # main.py
+
 import asyncio
 import sys
 import logging
@@ -29,15 +30,7 @@ from plot_generator import (
     display_summary,
 )
 from utils import clear_data
-from typing import Dict
-
-
-# TODO: - examine packet loss data and see how to incorporate it better
-#       - Turn it into a python package to make it pip installable
-#       - add cross platform compatibility
-#       - Look up how to incorporate real-time graph.
-#       - add more config options
-#       - update documentation to reflect changes
+from typing import Dict, Optional
 
 # Initialize Rich Console
 console = Console()
@@ -106,6 +99,7 @@ def process_file_mode(args, config):
             config=config,
             no_aggregation=args.no_aggregation,
             duration=args.duration,
+            latency_threshold=args.latency_threshold,
         )
         console.print("[bold green]Processing of ping file completed.[/bold green]")
         logging.info("Processing of ping file completed.")
@@ -196,9 +190,6 @@ async def run_ping_monitoring(args, config, results_subfolder):
 
 
 def process_ping_results(results_subfolder, args) -> Dict[str, Dict[str, pd.DataFrame]]:
-    """
-    Processes ping results and returns a data dictionary.
-    """
     data_dict = {}
     ip_files = [
         f
@@ -232,12 +223,16 @@ def process_ping_results(results_subfolder, args) -> Dict[str, Dict[str, pd.Data
 
         if aggregate:
             aggregated_data = aggregate_ping_times(ping_times, interval=60)
-            agg_df = pd.DataFrame(
-                aggregated_data, columns=["Time (s)", "Mean Latency (ms)"]
+            agg_df: Optional[pd.DataFrame] = pd.DataFrame(
+                aggregated_data,
+                columns=["Time (s)", "Mean Latency (ms)", "Packet Loss (%)"],
             )
             # Ensure no NaN values in agg_df
             agg_df["Mean Latency (ms)"] = agg_df["Mean Latency (ms)"].fillna(0.0)
-            logging.debug(f"Aggregated data for {ip_address}: {aggregated_data}")
+            agg_df["Packet Loss (%)"] = agg_df["Packet Loss (%)"].fillna(
+                100.0
+            )  # If packet loss is NaN, assume 100%
+            logging.debug(f"Aggregated data for {ip_address}:\n{agg_df}")
             logging.info(
                 f"Aggregated {len(aggregated_data)} intervals for {ip_address}."
             )
@@ -255,14 +250,20 @@ def process_ping_results(results_subfolder, args) -> Dict[str, Dict[str, pd.Data
     return data_dict
 
 
-def display_plots_and_summary(data_dict, config):
+def display_plots_and_summary(data_dict, config, latency_threshold: float):
     """
     Generates plots and displays summary statistics if data is available.
+
+    :param data_dict: Dictionary containing ping data for each IP.
+    :param config: Configuration dictionary.
+    :param latency_threshold: Latency threshold in milliseconds for highlighting high latency regions.
     """
     # Generate plots if data is available
     if data_dict:
         console.print("[bold blue]Generating plots...[/bold blue]")
-        generate_plots(config=config, data_dict=data_dict)
+        generate_plots(
+            config=config, data_dict=data_dict, latency_threshold=latency_threshold
+        )
         console.print("[bold green]Plot generation completed.[/bold green]")
         logging.info("Plot generation completed.")
     else:
@@ -282,8 +283,10 @@ def display_plots_and_summary(data_dict, config):
 async def main():
     # Parse command-line arguments
     args = parse_arguments()
+
     # Load configuration
     config = load_config()
+
     # Setup logging (logs are written to files only)
     setup_logging(config.get("log_folder", "logs"))
 
@@ -312,8 +315,11 @@ async def main():
     # Process ping results
     data_dict = process_ping_results(results_subfolder, args)
 
+    # Retrieve latency_threshold from arguments
+    latency_threshold = args.latency_threshold
+
     # Generate plots and display summary statistics
-    display_plots_and_summary(data_dict, config)
+    display_plots_and_summary(data_dict, config, latency_threshold)
 
 
 if __name__ == "__main__":

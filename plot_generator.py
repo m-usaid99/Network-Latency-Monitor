@@ -3,11 +3,15 @@
 import logging
 import os
 import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
+from datetime import datetime
 import seaborn as sns
 import pandas as pd
 from typing import List, Tuple, Dict, Optional
 from rich.table import Table
 from rich.console import Console
+
+console = Console()
 
 
 def extract_ping_times(file_path: str) -> List[Optional[float]]:
@@ -106,13 +110,13 @@ def display_summary(data_dict: dict) -> None:
 
 def aggregate_ping_times(
     ping_times: List[Optional[float]], interval: int
-) -> List[Tuple[float, float]]:
+) -> List[Tuple[float, float, float]]:
     """
     Aggregates ping times over specified intervals and assigns aggregate points at the midpoint of each interval.
 
     :param ping_times: List of ping times where None represents a lost ping.
     :param interval: Interval in seconds to aggregate pings.
-    :return: List of tuples containing (Midpoint Time Interval, Mean Latency)
+    :return: List of tuples containing (Midpoint Time Interval, Mean Latency, Packet Loss Percentage)
     """
     aggregated_data = []
     total_intervals = len(ping_times) // interval
@@ -121,142 +125,204 @@ def aggregate_ping_times(
         start = i * interval
         end = start + interval
         interval_pings = ping_times[start:end]
-        # Filter out None values
         successful_pings = [pt for pt in interval_pings if pt is not None]
+        lost_pings = len(interval_pings) - len(successful_pings)
+        packet_loss = (lost_pings / interval) * 100 if interval > 0 else 0
+
         if successful_pings:
             mean_latency = sum(successful_pings) / len(successful_pings)
-            midpoint_time = start + (interval / 2)
-            aggregated_data.append((midpoint_time, mean_latency))
-            logging.debug(
-                f"Interval {start}-{end}s: Mean Latency = {mean_latency} ms at {midpoint_time}s"
-            )
         else:
-            # If all pings in the interval were lost, assign mean_latency as 0.0
-            midpoint_time = start + (interval / 2)
-            aggregated_data.append((midpoint_time, 0.0))
+            mean_latency = 0.0  # Indicate all pings lost
+
+        midpoint_time = start + (interval / 2)
+        aggregated_data.append((midpoint_time, mean_latency, packet_loss))
+
+        if lost_pings == interval:
             logging.warning(
                 f"All pings lost in interval {start}-{end} seconds. Mean Latency set to 0.0 ms at {midpoint_time}s."
             )
+        else:
+            logging.debug(
+                f"Interval {start}-{end}s: Mean Latency = {mean_latency} ms, Packet Loss = {packet_loss}% at {midpoint_time}s"
+            )
 
-    # Handle any remaining pings that don't complete a full interval
+    # Handle remaining pings
     remaining_pings = ping_times[total_intervals * interval :]
     if remaining_pings:
         successful_pings = [pt for pt in remaining_pings if pt is not None]
+        lost_pings = len(remaining_pings) - len(successful_pings)
+        packet_loss = (
+            (lost_pings / len(remaining_pings)) * 100 if len(remaining_pings) > 0 else 0
+        )
+
         if successful_pings:
             mean_latency = sum(successful_pings) / len(successful_pings)
-            midpoint_time = total_intervals * interval + (len(remaining_pings) / 2)
-            aggregated_data.append((midpoint_time, mean_latency))
-            logging.debug(
-                f"Remaining Interval {total_intervals * interval}-{total_intervals * interval + len(remaining_pings)}s: Mean Latency = {mean_latency} ms at {midpoint_time}s"
-            )
         else:
-            midpoint_time = total_intervals * interval + (len(remaining_pings) / 2)
-            aggregated_data.append((midpoint_time, 0.0))
+            mean_latency = 0.0
+
+        midpoint_time = total_intervals * interval + (len(remaining_pings) / 2)
+        aggregated_data.append((midpoint_time, mean_latency, packet_loss))
+
+        if lost_pings == len(remaining_pings):
             logging.warning(
                 f"All pings lost in remaining interval {total_intervals * interval}-{total_intervals * interval + len(remaining_pings)} seconds. Mean Latency set to 0.0 ms at {midpoint_time}s."
+            )
+        else:
+            logging.debug(
+                f"Remaining Interval {total_intervals * interval}-{total_intervals * interval + len(remaining_pings)}s: Mean Latency = {mean_latency} ms, Packet Loss = {packet_loss}% at {midpoint_time}s"
             )
 
     return aggregated_data
 
 
-def generate_plots(config: dict, data_dict: Dict[str, Dict[str, pd.DataFrame]]) -> None:
+def generate_plots(
+    config: Dict[str, str],
+    data_dict: Dict[str, Dict[str, Optional[pd.DataFrame]]],
+    latency_threshold: float,
+) -> None:
     """
-    Generates and saves the plot based on the provided data.
+    Generates and saves a consolidated latency plot for all IP addresses,
+    highlighting regions where latency exceeds the specified threshold.
+    The plot is saved inside a timestamped subdirectory within the designated plots folder.
 
-    :param config: Configuration dictionary.
-    :param data_dict: Dictionary containing raw and aggregated data for each IP.
+    :param config: Configuration dictionary containing paths and settings.
+    :param data_dict: Dictionary containing raw and aggregated ping data for each IP address.
+    :param latency_threshold: Latency threshold in milliseconds for highlighting high latency regions.
     """
+    # Retrieve the base plots folder from the configuration
     plots_folder = config.get("plots_folder", "plots")
-    os.makedirs(plots_folder, exist_ok=True)
 
-    # Create a timestamped subdirectory for plots
-    current_date = pd.Timestamp.now().strftime("%Y-%m-%d_%H-%M-%S")
-    plot_subfolder = os.path.join(plots_folder, f"plots_{current_date}")
-    os.makedirs(plot_subfolder, exist_ok=True)
-    logging.info(f"Created plot subdirectory: {plot_subfolder}")
+    # Generate a timestamp for the subdirectory name
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
-    # Set Seaborn theme
-    sns.set_theme(style=config["plot"].get("theme", "darkgrid"))
+    # Create a timestamped subdirectory within the plots folder
+    plots_subfolder = os.path.join(plots_folder, f"plots_{timestamp}")
+    os.makedirs(plots_subfolder, exist_ok=True)
+    logging.info(f"Created plots subdirectory: {plots_subfolder}")
 
-    # Initialize color palette based on number of IPs
-    num_ips = len(data_dict)
-    if num_ips == 0:
-        logging.warning("No data available for plotting.")
-        return
+    plt.figure(figsize=(14, 8))
 
-    colors = sns.color_palette("husl", n_colors=num_ips)
-    ip_color_map = {ip: colors[idx] for idx, ip in enumerate(data_dict.keys())}
+    # Define a color palette with as many colors as IPs
+    palette = sns.color_palette("deep", n_colors=len(data_dict))
 
-    # Determine overall max ping
-    overall_max_ping = 0
-    for ip, data in data_dict.items():
-        raw_max = data["raw"]["Ping (ms)"].max()
-        overall_max_ping = max(overall_max_ping, raw_max)
-        if data["aggregated"] is not None:
-            agg_max = data["aggregated"]["Mean Latency (ms)"].max()
-            overall_max_ping = max(overall_max_ping, agg_max)
+    # List to collect all high latency times across IPs
+    high_latency_times = []
 
-    # Calculate dynamic y-axis limit
-    if overall_max_ping > 800:
-        y_max = 800
-    else:
-        y_max = overall_max_ping * 1.05  # Add 5% padding
+    for idx, (ip, data) in enumerate(data_dict.items()):
+        raw_df = data["raw"]
+        agg_df = data["aggregated"]
+        color = palette[idx % len(palette)]
 
-    # Create the plot
-    plt.figure(figsize=tuple(config["plot"].get("figure_size", [20, 15])))
-
-    for ip, data in data_dict.items():
-        color = ip_color_map[ip]
-        # Plot raw data
+        # Plot Raw Ping with low opacity
         sns.lineplot(
-            data=data["raw"],
             x="Time (s)",
             y="Ping (ms)",
-            label=f"Raw Data ({ip})",
+            data=raw_df,
+            label=f"{ip} Raw Ping",
             color=color,
-            linewidth=1.5,
+            alpha=0.5,
         )
 
-        # Plot aggregated data if available
-        if data["aggregated"] is not None:
+        if agg_df is not None:
+            # Plot Mean Latency
             sns.lineplot(
-                data=data["aggregated"],
                 x="Time (s)",
                 y="Mean Latency (ms)",
-                label=f"Mean Latency (per minute) ({ip})",
-                linestyle="dotted",
+                data=agg_df,
+                label=f"{ip} Mean Latency",
+                linestyle="--",
                 marker="o",
                 color=color,
-                linewidth=1.5,
             )
 
-    # Customize plot
-    plt.title(
-        "WiFi Network Ping Over Time",
-        fontsize=config["plot"]["font"].get("title_size", 24),
+            # Identify High Latency Points
+            high_latency = agg_df[agg_df["Mean Latency (ms)"] > latency_threshold]
+            if not high_latency.empty:
+                # Scatter plot for High Latency Points
+                sns.scatterplot(
+                    x="Time (s)",
+                    y="Mean Latency (ms)",
+                    data=high_latency,
+                    label=f"{ip} High Latency",
+                    color=color,
+                    marker="D",
+                    s=100,
+                )
+                # Annotate High Latency Points
+                for _, row in high_latency.iterrows():
+                    plt.annotate(
+                        f"{row['Mean Latency (ms)']} ms",
+                        (row["Time (s)"], row["Mean Latency (ms)"]),
+                        textcoords="offset points",
+                        xytext=(0, 10),
+                        ha="center",
+                        fontsize=8,
+                        color=color,
+                    )
+                # Collect high latency times for shading
+                high_latency_times.extend(high_latency["Time (s)"].tolist())
+
+    # Consolidate high latency times into shading regions
+    shading_regions = []
+    if high_latency_times:
+        # Sort and remove duplicates
+        sorted_times = sorted(set(high_latency_times))
+        # Initialize the first shading region
+        start = sorted_times[0]
+        end = sorted_times[0]
+
+        for time in sorted_times[1:]:
+            if time == end + 1:
+                end = time
+            else:
+                shading_regions.append((start, end))
+                start = time
+                end = time
+        # Append the last shading region
+        shading_regions.append((start, end))
+
+        # Shade each high latency region
+        for region in shading_regions:
+            plt.axvspan(
+                region[0] - 0.5,  # Slight padding on the left
+                region[1] + 0.5,  # Slight padding on the right
+                color="red",
+                alpha=0.1,
+                label="High Latency" if region == shading_regions[0] else "",
+            )
+
+    # Customize Legend to avoid duplicate labels
+    handles, labels = plt.gca().get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))
+    plt.legend(
+        by_label.values(), by_label.keys(), loc="upper left", bbox_to_anchor=(1.05, 1)
     )
-    plt.xlabel("Time (seconds)", fontsize=config["plot"]["font"].get("label_size", 22))
-    plt.ylabel("Ping (ms)", fontsize=config["plot"]["font"].get("label_size", 22))
-    plt.legend(fontsize=config["plot"]["font"].get("legend_size", 20))
-    plt.ylim(0, y_max)  # Dynamic y-axis limit
 
-    # Customize tick parameters
-    plt.xticks(fontsize=config["plot"]["font"].get("tick_size", 20))
-    plt.yticks(fontsize=config["plot"]["font"].get("tick_size", 20))
-
-    # Adjust layout for better spacing
+    plt.title("Ping Monitoring")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Latency (ms)")
+    plt.grid(True)
     plt.tight_layout()
 
+    # Define the plot filename with date and time
+    plot_filename = f"ping_plot_{timestamp}.png"
+    plot_path = os.path.join(plots_subfolder, plot_filename)
+
     # Save the plot
-    plot_filename = f"wifi_ping_plot_{current_date}.png"
-    plot_path = os.path.join(plot_subfolder, plot_filename)
-    plt.savefig(plot_path, dpi=config["plot"].get("dpi", 100))
+    plt.savefig(plot_path)
     plt.close()
-    logging.info(f"Generated plot: {plot_path}")
+    logging.info(f"Generated consolidated plot: {plot_path}")
+
+    # Notify the user
+    console.print(f"[bold green]Generated consolidated plot:[/bold green] {plot_path}")
 
 
 def process_ping_file(
-    file_path: str, config: dict, no_aggregation: bool, duration: int
+    file_path: str,
+    config: dict,
+    no_aggregation: bool,
+    duration: int,
+    latency_threshold: float,
 ) -> None:
     """
     Processes a single ping result file and generates the corresponding plot.
@@ -320,4 +386,4 @@ def process_ping_file(
     logging.info(f"Created plot subdirectory: {plot_subfolder}")
 
     # Generate and save the plot
-    generate_plots(config, data_dict)
+    generate_plots(config, data_dict, latency_threshold)

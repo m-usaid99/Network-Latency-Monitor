@@ -45,6 +45,13 @@ def parse_arguments() -> argparse.Namespace:
         help="Path to an existing ping result file to process.\n\nExample:\n  -f results/results_2024-04-27_12-34-56/ping_results_8.8.8.8.txt",
     )
 
+    optional.add_argument(
+        "--latency-threshold",
+        type=float,
+        default=150.0,
+        help="Latency threshold in milliseconds for highlighting high latency regions.",
+    )
+
     # Aggregation arguments
     aggregation = parser.add_argument_group("Aggregation Options")
 
@@ -86,4 +93,3 @@ def parse_arguments() -> argparse.Namespace:
     )
 
     return parser.parse_args()
-
