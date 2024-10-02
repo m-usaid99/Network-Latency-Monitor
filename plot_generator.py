@@ -3,7 +3,6 @@
 import logging
 import os
 import matplotlib.pyplot as plt
-from matplotlib.axes import Axes
 from datetime import datetime
 import seaborn as sns
 import pandas as pd
@@ -183,6 +182,7 @@ def generate_plots(
     """
     Generates and saves a consolidated latency plot for all IP addresses,
     highlighting regions where latency exceeds the specified threshold.
+    Lost packets are represented as 800 ms in the plot.
     The plot is saved inside a timestamped subdirectory within the designated plots folder.
 
     :param config: Configuration dictionary containing paths and settings.
@@ -202,7 +202,7 @@ def generate_plots(
 
     plt.figure(figsize=(14, 8))
 
-    # Define a color palette with as many colors as IPs
+    # Define a darker color palette
     palette = sns.color_palette("deep", n_colors=len(data_dict))
 
     # List to collect all high latency times across IPs
@@ -213,14 +213,24 @@ def generate_plots(
         agg_df = data["aggregated"]
         color = palette[idx % len(palette)]
 
-        # Plot Raw Ping with low opacity
+        # Create a copy of raw_df for plotting and map lost packets to 800 ms
+        plot_raw_df = raw_df.copy()
+        plot_raw_df["Ping (ms)"] = plot_raw_df["Ping (ms)"].fillna(800.0)
+
+        # Identify High Latency Times from Raw Data
+        high_latency = plot_raw_df[plot_raw_df["Ping (ms)"] > latency_threshold]
+        if not high_latency.empty:
+            # Collect high latency times for shading
+            high_latency_times.extend(high_latency["Time (s)"].tolist())
+
+        # Plot Raw Ping with increased opacity
         sns.lineplot(
             x="Time (s)",
             y="Ping (ms)",
-            data=raw_df,
+            data=plot_raw_df,
             label=f"{ip} Raw Ping",
             color=color,
-            alpha=0.5,
+            alpha=0.6,
         )
 
         if agg_df is not None:
@@ -233,34 +243,8 @@ def generate_plots(
                 linestyle="--",
                 marker="o",
                 color=color,
+                alpha=0.8,
             )
-
-            # Identify High Latency Points
-            high_latency = agg_df[agg_df["Mean Latency (ms)"] > latency_threshold]
-            if not high_latency.empty:
-                # Scatter plot for High Latency Points
-                sns.scatterplot(
-                    x="Time (s)",
-                    y="Mean Latency (ms)",
-                    data=high_latency,
-                    label=f"{ip} High Latency",
-                    color=color,
-                    marker="D",
-                    s=100,
-                )
-                # Annotate High Latency Points
-                for _, row in high_latency.iterrows():
-                    plt.annotate(
-                        f"{row['Mean Latency (ms)']} ms",
-                        (row["Time (s)"], row["Mean Latency (ms)"]),
-                        textcoords="offset points",
-                        xytext=(0, 10),
-                        ha="center",
-                        fontsize=8,
-                        color=color,
-                    )
-                # Collect high latency times for shading
-                high_latency_times.extend(high_latency["Time (s)"].tolist())
 
     # Consolidate high latency times into shading regions
     shading_regions = []

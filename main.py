@@ -35,6 +35,12 @@ from typing import Dict, Optional
 # Initialize Rich Console
 console = Console()
 
+# TODO: - fix graph splitting behavior
+#       - figure out real-time graph
+#       - turn it into publishable package
+#       - create documentation
+#       - redo Readme
+
 
 def ask_confirmation(message: str, auto_confirm: bool) -> bool:
     """
