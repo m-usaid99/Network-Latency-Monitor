@@ -256,19 +256,25 @@ def process_ping_results(results_subfolder, args) -> Dict[str, Dict[str, pd.Data
     return data_dict
 
 
-def display_plots_and_summary(data_dict, config, latency_threshold: float):
+def display_plots_and_summary(args, data_dict, config):
     """
     Generates plots and displays summary statistics if data is available.
 
+    :param args: Command-line arguments.
     :param data_dict: Dictionary containing ping data for each IP.
     :param config: Configuration dictionary.
-    :param latency_threshold: Latency threshold in milliseconds for highlighting high latency regions.
     """
+    latency_threshold = args.latency_threshold
+    no_segmentation = args.no_segmentation
+
     # Generate plots if data is available
     if data_dict:
         console.print("[bold blue]Generating plots...[/bold blue]")
         generate_plots(
-            config=config, data_dict=data_dict, latency_threshold=latency_threshold
+            config=config,
+            data_dict=data_dict,
+            latency_threshold=latency_threshold,
+            no_segmentation=no_segmentation,
         )
         console.print("[bold green]Plot generation completed.[/bold green]")
         logging.info("Plot generation completed.")
@@ -321,11 +327,8 @@ async def main():
     # Process ping results
     data_dict = process_ping_results(results_subfolder, args)
 
-    # Retrieve latency_threshold from arguments
-    latency_threshold = args.latency_threshold
-
     # Generate plots and display summary statistics
-    display_plots_and_summary(data_dict, config, latency_threshold)
+    display_plots_and_summary(args, data_dict, config)
 
 
 if __name__ == "__main__":

@@ -52,6 +52,12 @@ def parse_arguments() -> argparse.Namespace:
         help="Latency threshold in milliseconds for highlighting high latency regions.",
     )
 
+    optional.add_argument(
+        "--no-segmentation",
+        action="store_true",
+        help="Generate a single plot for the entire duration without segmentation.",
+    )
+
     # Aggregation arguments
     aggregation = parser.add_argument_group("Aggregation Options")
 
