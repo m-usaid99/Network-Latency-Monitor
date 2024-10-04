@@ -33,11 +33,6 @@ def extract_ping_times(file_path: str) -> List[Optional[float]]:
                 else:
                     try:
                         ping_time = float(line)
-                        if ping_time > 800.0:
-                            ping_time = 800.0
-                            logging.warning(
-                                f"Capped ping time at 800 ms in file {file_path}"
-                            )
                         ping_times.append(ping_time)
                     except ValueError:
                         # Handle unexpected line format
@@ -329,7 +324,9 @@ def generate_plots(
 
         plt.xlabel("Time (s)")
         plt.ylabel("Latency (ms)")
-        plt.grid(True)
+        plt.grid(
+            color="lightgray", linestyle="--", linewidth=0.5, alpha=0.7
+        )  # Customized grid
         plt.tight_layout()
 
         # Define the plot filename with date and time

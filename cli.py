@@ -48,7 +48,7 @@ def parse_arguments() -> argparse.Namespace:
     optional.add_argument(
         "--latency-threshold",
         type=float,
-        default=150.0,
+        default=200.0,
         help="Latency threshold in milliseconds for highlighting high latency regions.",
     )
 
