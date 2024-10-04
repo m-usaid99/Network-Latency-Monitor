@@ -35,7 +35,7 @@ from typing import Dict, Optional
 # Initialize Rich Console
 console = Console()
 
-# TODO: - fix graph splitting behavior
+# TODO: - use actual ping values for max latency
 #       - figure out real-time graph
 #       - turn it into publishable package
 #       - create documentation
