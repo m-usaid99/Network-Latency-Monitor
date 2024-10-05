@@ -6,6 +6,7 @@ import logging
 import os
 from rich.console import Console
 from rich.console import Group
+from rich.columns import Columns
 from rich.prompt import Prompt
 from rich.progress import (
     Progress,
@@ -14,7 +15,6 @@ from rich.progress import (
     BarColumn,
     TimeElapsedColumn,
     TimeRemainingColumn,
-    Task,
 )
 from datetime import datetime
 import pandas as pd
@@ -37,7 +37,6 @@ import asciichartpy
 from collections import deque
 from rich.live import Live
 from rich.text import Text
-from rich.layout import Layout
 from rich.panel import Panel
 
 # Initialize Rich Console
@@ -205,32 +204,102 @@ async def run_ping_monitoring(args, config, results_subfolder, latency_data):
         )
         tasks.append(task)
 
+    # Calculate dynamic graph dimensions
+    terminal_width = console.size.width
+    terminal_height = console.size.height
+    reserved_height = 10  # Reserve some lines for margins and other info
+    progress_bar_height = len(ips) * 3  # Approximate progress bar height
+    available_height = terminal_height - reserved_height - progress_bar_height
+    graph_height = (
+        max(5, available_height // len(ips)) if len(ips) > 0 else 5
+    )  # Ensure a minimum height
+
+    # Define a sliding window size
+    window_size = 50  # Number of recent data points to display
+
     # Start the Live context
     with Live(console=console, refresh_per_second=4) as live:
         while not all(task.done() for task in tasks):
             # Generate ASCII charts
             charts = []
             for ip in ips:
-                data = latency_data[ip]
+                data = list(latency_data[ip])[
+                    -window_size:
+                ]  # Get the most recent data points
+                current_max = max(data) if data else 100
+                plot_max = max(current_max, 100)  # Ensure plot max is at least 100ms
+
+                # Determine graph width based on number of columns
+                if len(ips) == 1:
+                    graph_width = (
+                        terminal_width - 10
+                    )  # Use most of the terminal width for a single IP
+                elif len(ips) <= 2:
+                    graph_width = (
+                        terminal_width // 2
+                    ) - 10  # Split the terminal width between two IPs
+                else:
+                    graph_width = (
+                        terminal_width // 3
+                    ) - 10  # Adjust as needed for more IPs
+
                 chart = asciichartpy.plot(
-                    list(data),
+                    data,
                     {
-                        "height": 10,
+                        "height": graph_height,
                         "min": 0,
-                        "max": 100,  # Adjust based on expected latency
+                        "max": plot_max,
                         "format": "{:>6.1f}",
                         "padding": 1,
+                        "width": graph_width,
                     },
                 )
-                charts.append(Panel(f"IP Address: {ip}\n{chart}", expand=False))
+
+                # Determine color based on current max latency
+                if current_max < 75:
+                    color = "green"
+                elif current_max < 100:
+                    color = "yellow"
+                else:
+                    color = "red"
+
+                colored_chart = f"[{color}]{chart}[/{color}]"
+                charts.append(
+                    Panel(colored_chart, title=f"IP: {ip}", border_style=color)
+                )
+
+            # Organize charts into columns
+            if len(charts) > 1:
+                charts_renderable = Columns(charts, equal=True)
+            else:
+                charts_renderable = (
+                    charts[0]
+                    if charts
+                    else Panel(
+                        "No Data", title="Real-time Latency Graphs", border_style="grey"
+                    )
+                )
+
+            # Create the legend panel with markup enabled
+            legend_text = Text.from_markup(
+                "Legend: [green]Green[/green] < 50ms | [yellow]Yellow[/yellow] 50ms-80ms | [red]Red[/red] > 80ms",
+                style="bold",
+            )
+            legend_panel = Panel(legend_text, border_style="none", expand=False)
+
+            # Combine charts and legend
+            charts_renderable = Group(charts_renderable, legend_panel)
+
+            # Render the progress bars
+            progress_renderable = Panel(
+                progress, title="Ping Progress", border_style="blue", expand=False
+            )
 
             # Combine progress and charts into a single renderable
-            renderables = [
-                Panel(progress, title="Ping Progress", expand=False)
-            ] + charts
+            combined = Group(progress_renderable, charts_renderable)
 
             # Update the Live display
-            live.update(Group(*renderables))
+            live.update(combined)
 
             await asyncio.sleep(0.5)  # Adjust the sleep time as needed
 
