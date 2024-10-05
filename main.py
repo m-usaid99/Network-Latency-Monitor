@@ -5,6 +5,7 @@ import sys
 import logging
 import os
 from rich.console import Console
+from rich.console import Group
 from rich.prompt import Prompt
 from rich.progress import (
     Progress,
@@ -13,6 +14,7 @@ from rich.progress import (
     BarColumn,
     TimeElapsedColumn,
     TimeRemainingColumn,
+    Task,
 )
 from datetime import datetime
 import pandas as pd
@@ -31,6 +33,12 @@ from plot_generator import (
 )
 from utils import clear_data
 from typing import Dict, Optional
+import asciichartpy
+from collections import deque
+from rich.live import Live
+from rich.text import Text
+from rich.layout import Layout
+from rich.panel import Panel
 
 # Initialize Rich Console
 console = Console()
@@ -157,41 +165,76 @@ def create_results_directory(config) -> str:
     return results_subfolder
 
 
-async def run_ping_monitoring(args, config, results_subfolder):
+async def run_ping_monitoring(args, config, results_subfolder, latency_data):
     """
-    Initiates ping monitoring with progress bars.
+    Initiates ping monitoring with progress bars and real-time graphs.
     """
     duration = args.duration
     ping_interval = args.ping_interval
     ips = args.ip_addresses
     tasks = []
 
-    with Progress(
+    # Initialize Rich Progress
+    progress = Progress(
         SpinnerColumn(),
-        TextColumn("[bold blue]Pinging {task.description}"),
+        TextColumn("[bold blue]{task.description}"),
         BarColumn(),
         "[progress.percentage]{task.percentage:>3.1f}%",
         TimeElapsedColumn(),
         TimeRemainingColumn(),
         console=console,
         transient=False,
-    ) as progress:
-        for ip in ips:
-            results_file = os.path.join(results_subfolder, f"ping_results_{ip}.txt")
-            # Initialize each progress bar with a unique task
-            task_id = progress.add_task(f"[cyan]{ip}", total=duration)
-            task = asyncio.create_task(
-                run_ping(
-                    ip_address=ip,
-                    duration=duration,
-                    interval=ping_interval,
-                    results_file=results_file,
-                    progress=progress,
-                    task_id=task_id,
-                )
-            )
-            tasks.append(task)
+    )
 
+    # Create tasks for each IP
+    task_id_map = {}
+    for ip in ips:
+        results_file = os.path.join(results_subfolder, f"ping_results_{ip}.txt")
+        task_id = progress.add_task(f"Pinging [cyan]{ip}[/cyan]", total=duration)
+        task_id_map[ip] = task_id
+        task = asyncio.create_task(
+            run_ping(
+                ip_address=ip,
+                duration=duration,
+                interval=ping_interval,
+                results_file=results_file,
+                progress=progress,
+                task_id=task_id,
+                latency_data=latency_data,
+            )
+        )
+        tasks.append(task)
+
+    # Start the Live context
+    with Live(console=console, refresh_per_second=4) as live:
+        while not all(task.done() for task in tasks):
+            # Generate ASCII charts
+            charts = []
+            for ip in ips:
+                data = latency_data[ip]
+                chart = asciichartpy.plot(
+                    list(data),
+                    {
+                        "height": 10,
+                        "min": 0,
+                        "max": 100,  # Adjust based on expected latency
+                        "format": "{:>6.1f}",
+                        "padding": 1,
+                    },
+                )
+                charts.append(Panel(f"IP Address: {ip}\n{chart}", expand=False))
+
+            # Combine progress and charts into a single renderable
+            renderables = [
+                Panel(progress, title="Ping Progress", expand=False)
+            ] + charts
+
+            # Update the Live display
+            live.update(Group(*renderables))
+
+            await asyncio.sleep(0.5)  # Adjust the sleep time as needed
+
+        # Wait for all tasks to complete
         await asyncio.gather(*tasks)
 
 
@@ -318,9 +361,16 @@ async def main():
     # Create results subdirectory with timestamp
     results_subfolder = create_results_directory(config)
 
-    # Start ping monitoring with enhanced progress bars
+    # Initialize in-memory latency data storage
+    latency_window = 30  # Number of data points in the sliding window
+    latency_data = {
+        ip: deque([0] * latency_window, maxlen=latency_window)
+        for ip in args.ip_addresses
+    }
+
+    # Start ping monitoring with enhanced progress bars and real-time charts
     console.print("[bold blue]Starting ping monitoring...[/bold blue]")
-    await run_ping_monitoring(args, config, results_subfolder)
+    await run_ping_monitoring(args, config, results_subfolder, latency_data)
     console.print("[bold green]Ping monitoring completed.[/bold green]")
     logging.info("All ping tasks completed.")
 

@@ -5,6 +5,8 @@ import logging
 import sys
 import re
 from rich.progress import Progress, TaskID
+from typing import Dict
+from collections import deque
 
 
 async def run_ping(
@@ -14,6 +16,7 @@ async def run_ping(
     results_file: str,
     progress: Progress,
     task_id: TaskID,  # Updated type annotation
+    latency_data: Dict[str, deque],  # Add latency_data parameter
 ):
     loop = asyncio.get_event_loop()
     start_time = loop.time()
@@ -95,6 +98,8 @@ async def run_ping(
                     description=description,
                 )
                 logging.info(f"Ping to {ip_address}: {current_latency} ms")
+                # Update in-memory latency data
+                latency_data[ip_address].append(current_latency)
             else:
                 description = f"[cyan]{ip_address} - Lost"
                 progress.update(
@@ -103,6 +108,8 @@ async def run_ping(
                     description=description,
                 )
                 logging.warning(f"Ping to {ip_address} lost or latency not measurable.")
+                # Append 0 to represent lost ping
+                latency_data[ip_address].append(0)
 
         # Calculate time until next ping
         iteration_end_time = loop.time()
