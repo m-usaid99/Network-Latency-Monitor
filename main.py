@@ -42,11 +42,11 @@ from rich.panel import Panel
 # Initialize Rich Console
 console = Console()
 
-# TODO: - use actual ping values for max latency
-#       - figure out real-time graph
+# TODO: - fix graph bug (ylim not proper)
+#       - update legend in tui
+#       - try to fix flicker
 #       - turn it into publishable package
 #       - create documentation
-#       - redo Readme
 
 
 def ask_confirmation(message: str, auto_confirm: bool) -> bool:

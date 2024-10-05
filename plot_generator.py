@@ -230,6 +230,7 @@ def generate_plots(
             color = palette[idx % len(palette)]
             plot_raw_df = raw_df.copy()
             plot_raw_df["Ping (ms)"] = plot_raw_df["Ping (ms)"].fillna(800.0)
+            plot_raw_df["Ping (ms)"] = plot_raw_df["Ping (ms)"].clip(upper=800.0)
 
             # Filter data for the current segment
             segment_data = plot_raw_df[
@@ -399,6 +400,8 @@ def process_ping_file(
         y_max = 800
     else:
         y_max = overall_max_ping * 1.05  # Add 5% padding
+
+    plt.ylim(0, y_max)
 
     # Prepare data dictionary
     data_dict = {ip_address: {"raw": raw_df, "aggregated": agg_df}}
