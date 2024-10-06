@@ -277,9 +277,7 @@ async def run_ping_monitoring(config, results_subfolder, latency_data):
             # Generate ASCII charts
             charts = []
             for ip in ips:
-                data = list(latency_data[ip])[
-                    -window_size:
-                ]  # Get the most recent data points
+                data = list(latency_data[ip])[-window_size:]
                 current_max = max(data) if data else 100
                 plot_max = max(current_max, 100)  # Ensure plot max is at least 100ms
 
@@ -492,7 +490,7 @@ async def main():
     latency_window = 30  # Number of data points in the sliding window
     latency_data = {
         ip: deque([0] * latency_window, maxlen=latency_window)
-        for ip in args.ip_addresses
+        for ip in config["ip_addresses"]
     }
 
     # Start ping monitoring with enhanced progress bars and real-time charts
