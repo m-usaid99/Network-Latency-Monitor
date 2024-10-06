@@ -40,12 +40,13 @@ from network_latency_monitor import (
 console = Console()
 
 # TODO:
-#       - make main.py modular
-#       - figure out filepath where shit is saved
 #       - create documentation
-#       - turn it into publishable package
-#       - try to fix flicker
+#       - generate docs thru sphinx
+#       - redo Readme
+#       - turn it into publishable package (half-done)
 #       - add interactivity thru keyboard controls
+#       - cross OS compabitibility
+#       - figure out filepath where shit is saved
 
 
 async def main():
@@ -147,7 +148,6 @@ def cli():
         asyncio.run(main())
     except KeyboardInterrupt:
         console.print("\n[bold red]Ping monitoring interrupted by user.[/bold red]")
-        logging.warning("Ping monitoring interrupted by user.")
         sys.exit(0)
 
 

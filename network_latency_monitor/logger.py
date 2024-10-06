@@ -5,68 +5,96 @@ Logging Configuration
 
 Sets up logging for the Network Latency Monitor (NLM) tool. This module initializes
 the logging system, ensuring that logs are properly formatted and stored in designated
-log files with appropriate log levels.
+log files with appropriate log levels. It implements log rotation to manage log file sizes
+and prevents duplicate log entries by configuring the logger as a singleton.
 
 Functions:
-    - setup_logging: Configures logging settings.
+    - setup_logging: Configures logging settings with log rotation and appropriate handlers.
 """
 
-import logging
 import os
 import sys
 from datetime import datetime
+import logging
+from logging.handlers import RotatingFileHandler
+
+# Define a module-level logger to implement the Singleton pattern
+_logger_initialized = False
 
 
-def setup_logging(log_folder: str) -> None:
+def setup_logging(
+    log_folder: str,
+    log_level_file: int = logging.INFO,
+    log_level_console: int = logging.WARNING,
+    max_bytes: int = 5 * 1024 * 1024,  # 5 MB
+    backup_count: int = 5,
+) -> None:
     """
-    Configures the logging settings for the NLM tool.
+    Configures the logging settings for the NLM tool with log rotation and appropriate handlers.
 
     This function sets up the logging system by creating a log directory if it doesn't exist,
-    initializing a log file with a timestamped name, and configuring the logging level and format.
-    It ensures that all logs are written to both the log file and the console for real-time monitoring.
+    initializing a log file with a timestamped name, and configuring both file and console
+    handlers with specified logging levels. It also implements log rotation to prevent log
+    files from growing indefinitely and ensures that logging is configured only once to
+    avoid duplicate log entries.
 
     Args:
         log_folder (str): The directory where log files will be stored.
+        log_level_file (int, optional): Logging level for the file handler. Defaults to logging.INFO.
+        log_level_console (int, optional): Logging level for the console handler. Defaults to logging.WARNING.
+        max_bytes (int, optional): Maximum size in bytes for a single log file before rotation. Defaults to 5 MB.
+        backup_count (int, optional): Number of backup log files to keep. Defaults to 5.
 
     Raises:
         OSError: If the log directory cannot be created due to permission issues or other OS-related errors.
+
+    Example:
+        >>> setup_logging(log_folder="logs")
     """
+    global _logger_initialized
+
+    if _logger_initialized:
+        # Prevent re-initializing the logger
+        return
+
     try:
         # Create the log directory if it doesn't exist
         os.makedirs(log_folder, exist_ok=True)
-        logging.debug(f"Log directory ensured at: {log_folder}")
-
-        # Generate a timestamped log file name
-        current_date = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        log_file = os.path.join(log_folder, f"nlm_{current_date}.log")
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        log_file = os.path.join(log_folder, f"nlm_{timestamp}.log")
 
         # Create a custom logger
         logger = logging.getLogger()
         logger.setLevel(logging.DEBUG)  # Set the root logger level to DEBUG
 
-        # Prevent adding multiple handlers if the logger already has them
-        if not logger.handlers:
-            # Create handlers
-            file_handler = logging.FileHandler(log_file)
-            file_handler.setLevel(logging.INFO)  # Set file handler to INFO level
+        # File Handler with log rotation
+        file_handler = RotatingFileHandler(
+            log_file, maxBytes=max_bytes, backupCount=backup_count
+        )
+        file_handler.setLevel(log_level_file)  # Set file handler level
 
-            console_handler = logging.StreamHandler()
-            console_handler.setLevel(
-                logging.WARNING
-            )  # Set console handler to WARNING level
+        # Console Handler for critical issues
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(log_level_console)  # Set console handler level
 
-            # Create formatter and add it to the handlers
-            formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-            file_handler.setFormatter(formatter)
-            console_handler.setFormatter(formatter)
+        # Create formatter and add it to the handlers
+        formatter = logging.Formatter(
+            fmt="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+        file_handler.setFormatter(formatter)
+        console_handler.setFormatter(formatter)
 
-            # Add the handlers to the logger
-            logger.addHandler(file_handler)
-            logger.addHandler(console_handler)
+        # Add the handlers to the logger
+        logger.addHandler(file_handler)
+        logger.addHandler(console_handler)
 
-            logging.info(f"Logging initialized. Logs are being written to: {log_file}")
-            logging.debug("File and console handlers added to the logger.")
+        # Log the initialization
+        logger.info(f"Logging initialized. Logs are being written to: {log_file}")
+        logger.debug("File and console handlers added to the logger.")
+
+        _logger_initialized = True  # Mark logger as initialized
+
     except OSError as e:
         print(f"Failed to create log directory '{log_folder}': {e}", file=sys.stderr)
         raise
-
