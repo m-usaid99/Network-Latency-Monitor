@@ -42,10 +42,10 @@ from collections import deque
 console = Console()
 
 # TODO:
+#       - fix clear commands issue
 #       - create documentation
 #       - turn it into publishable package
 #       - try to fix flicker
-#       - graceful error handling for keyboard interrupt
 #       - add interactivity thru keyboard controls
 
 
@@ -72,6 +72,12 @@ def merge_args_into_config(args, config):
         "latency_threshold": "latency_threshold",
         "no_aggregation": "no_aggregation",
         "no_segmentation": "no_segmentation",
+        "file": "file",
+        "clear": "clear",
+        "clear_results": "clear_results",
+        "clear_plots": "clear_plots",  # Added clear_plots mapping
+        "clear_logs": "clear_logs",
+        "yes": "yes",
         # Add more mappings if needed
     }
 
@@ -116,26 +122,30 @@ def validate_config(config):
 
 def handle_clear_operations(config):
     """
-    Handles data clearing operations based on command-line arguments.
+    Handles data clearing operations based on configuration flags.
     """
     folders_to_clear = []
     confirmation_message = ""
 
-    # Assuming you have flags in config for clear operations
-    if config.get("clear"):
+    # Check if any clear operation is requested
+    if config.get("clear", False):
         folders_to_clear = [
             config.get("results_folder", "results"),
+            config.get("plots_folder", "plots"),  # Include plots_folder
             config.get("log_folder", "logs"),
         ]
         confirmation_message = (
-            "Are you sure you want to clear ALL data (results, logs)?"
+            "Are you sure you want to clear ALL data (results, plots, logs)?"
         )
     else:
-        if config.get("clear_results"):
+        if config.get("clear_results", False):
             folders_to_clear.append(config.get("results_folder", "results"))
-        if config.get("clear_logs"):
+        if config.get("clear_plots", False):  # Handle clear_plots
+            folders_to_clear.append(config.get("plots_folder", "plots"))
+        if config.get("clear_logs", False):
             folders_to_clear.append(config.get("log_folder", "logs"))
-        confirmation_message = "Are you sure you want to clear the selected data?"
+        if folders_to_clear:
+            confirmation_message = "[bold yellow]Are you sure you want to clear the selected data?[/bold yellow]"
 
     if folders_to_clear:
         if ask_confirmation(confirmation_message, config.get("yes", False)):
