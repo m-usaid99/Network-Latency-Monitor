@@ -41,10 +41,11 @@ from collections import deque
 # Initialize Rich Console
 console = Console()
 
-# TODO: - update legend in tui
-#       - try to fix flicker
-#       - turn it into publishable package
+# TODO:
 #       - create documentation
+#       - turn it into publishable package
+#       - try to fix flicker
+#       - make config file work properly
 
 
 def ask_confirmation(message: str, auto_confirm: bool) -> bool:
