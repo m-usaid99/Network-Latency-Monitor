@@ -1,5 +1,17 @@
 # config.py
 
+"""
+Configuration Management
+
+Handles loading, merging, validating, and regenerating configuration settings for NLM.
+
+Functions:
+    - load_config: Loads configuration from a YAML file.
+    - merge_args_into_config: Merges CLI arguments into the configuration.
+    - validate_config: Validates the configuration values.
+    - regenerate_default_config: Regenerates the default configuration file.
+"""
+
 import yaml
 import os
 import sys

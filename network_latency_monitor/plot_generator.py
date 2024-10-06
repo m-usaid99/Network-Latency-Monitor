@@ -1,5 +1,19 @@
 # plot_generator.py
 
+"""
+Plot Generator
+
+Handles the creation of visual plots and summary statistics based on ping results
+for the Network Latency Monitor (NLM) tool. This module provides functions to
+display summary tables, generate latency plots with optional segmentation, and
+combine both functionalities to present comprehensive results to the user.
+
+Functions:
+    - display_summary: Displays summary statistics in a formatted table.
+    - generate_plots: Generates latency plots based on configuration and data.
+    - display_plots_and_summary: Generates plots and displays summary statistics.
+"""
+
 import logging
 import os
 import matplotlib.pyplot as plt
@@ -16,9 +30,25 @@ console = Console()
 
 def display_summary(data_dict: dict) -> None:
     """
-    Displays summary statistics for each IP address using Rich's Table.
+    Displays summary statistics for each IP address in a formatted table.
 
-    :param data_dict: Dictionary containing ping data for each IP.
+    This function creates a Rich table that summarizes key metrics such as total pings,
+    successful pings, packet loss percentage, and latency statistics (average, min, max)
+    for each monitored IP address.
+
+    Args:
+        data_dict (Dict[str, Dict[str, pd.DataFrame]]): A nested dictionary where each key is
+            an IP address, and its value is another dictionary containing 'raw' and 'aggregated'
+            pandas DataFrames with ping data.
+
+    Example:
+        >>> data = {
+        ...     '8.8.8.8': {
+        ...         'raw': pd.DataFrame({'Ping (ms)': [23.5, 24.1, None, 25.0]}),
+        ...         'aggregated': pd.DataFrame({'Mean Latency (ms)': [24.2], 'Packet Loss (%)': [25.0]})
+        ...     }
+        ... }
+        >>> display_summary(data)
     """
     console = Console()
     table = Table(title="Ping Summary Statistics")
@@ -75,14 +105,25 @@ def generate_plots(
     no_segmentation: bool = False,
 ) -> None:
     """
-    Generates and saves latency plots for all IP addresses.
-    By default, plots are segmented into hourly intervals.
-    If no_segmentation is True, generates a single plot for the entire duration.
+    Generates latency plots based on the provided configuration and data.
 
-    :param config: Configuration dictionary containing paths and settings.
-    :param data_dict: Dictionary containing raw and aggregated ping data for each IP address.
-    :param latency_threshold: Latency threshold in milliseconds for highlighting high latency regions.
-    :param no_segmentation: If True, generates a single plot without segmentation.
+    This function creates latency plots for each IP address, optionally segmented into
+    hourly intervals. It highlights high latency regions based on the specified threshold
+    and saves the generated plots in a timestamped subdirectory within the plots folder.
+
+    Args:
+        config (Dict[str, str]): Configuration dictionary containing settings like
+            plots folder path and segmentation preferences.
+        data_dict (Dict[str, Dict[str, Optional[pd.DataFrame]]]): A nested dictionary where each key
+            is an IP address, and its value is another dictionary containing 'raw' and 'aggregated'
+            pandas DataFrames with ping data.
+        latency_threshold (float): Latency threshold in milliseconds for highlighting high latency regions.
+        no_segmentation (bool, optional): If True, generates a single plot for the entire duration
+            without segmentation. Defaults to False.
+
+    Raises:
+        OSError: If the plots subdirectory cannot be created.
+        Exception: For any other errors that occur during plot generation.
     """
     # Retrieve the base plots folder from the configuration
     plots_folder = config.get("plots_folder", "plots")
@@ -243,10 +284,19 @@ def generate_plots(
 
 def display_plots_and_summary(data_dict, config):
     """
-    Generates plots and displays summary statistics if data is available.
+    Coordinates plot generation and summary statistics display.
 
-    :param data_dict: Dictionary containing ping data for each IP.
-    :param config: Configuration dictionary.
+    This function checks if data is available and then calls `generate_plots` to create
+    visualizations and `display_summary` to present statistics in a table. It handles
+    scenarios where data may be missing.
+
+    Args:
+        data_dict (Dict[str, Dict[str, Optional[pd.DataFrame]]]): Nested dictionary containing ping data.
+        config (Dict): Configuration dictionary containing settings.
+
+    Example:
+        >>> display_plots_and_summary(data_dict, config)
+        # Generates plots and displays summary statistics.
     """
     latency_threshold = config.get("latency_threshold", 200.0)
     no_segmentation = config.get("no_segmentation", False)

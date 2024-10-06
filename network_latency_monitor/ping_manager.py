@@ -1,5 +1,16 @@
 # ping_manager.py
 
+"""
+Ping Manager
+
+Handles the core functionality of pinging IP addresses, managing asynchronous tasks,
+and providing real-time feedback through progress bars and latency graphs.
+
+Functions:
+    - run_ping_monitoring: Initiates ping monitoring with progress bars and real-time graphs.
+    - run_ping_monitoring: Initiates ping monitoring for multiple IP addresses with real-time visualizations.
+"""
+
 import asyncio
 import logging
 import os
@@ -36,6 +47,25 @@ async def run_ping(
     task_id: TaskID,  # Updated type annotation
     latency_data: Dict[str, deque],  # Add latency_data parameter
 ):
+    """
+    Executes the ping command for a specific IP address, records latency, and updates progress.
+
+    This asynchronous function pings the specified IP address at regular intervals, records
+    the latency results, updates the corresponding progress bar, and handles any errors
+    or lost packets.
+
+    Args:
+        ip_address (str): The IP address to ping.
+        duration (int): Total duration for which to ping, in seconds.
+        interval (int): Interval between consecutive pings, in seconds.
+        results_file (str): Path to the file where ping results are recorded.
+        progress (Progress): Rich Progress instance to update the progress bar.
+        task_id (TaskID): Identifier for the specific progress task.
+        latency_data (Dict[str, deque]): Dictionary storing latency data for each IP address.
+
+    Raises:
+        asyncio.SubprocessError: If the ping subprocess encounters an error.
+    """
     loop = asyncio.get_event_loop()
     start_time = loop.time()
     end_time = start_time + duration
@@ -146,7 +176,19 @@ async def run_ping(
 
 async def run_ping_monitoring(config, results_subfolder, latency_data):
     """
-    Initiates ping monitoring with progress bars and real-time graphs.
+    Initiates ping monitoring for multiple IP addresses with progress bars and real-time graphs.
+
+    This asynchronous function sets up ping tasks for each IP address based on the provided configuration.
+    It manages the execution of these tasks, updates progress bars, and renders real-time ASCII-based
+    latency graphs using Rich and asciichartpy.
+
+    Args:
+        config (dict): Configuration dictionary containing settings like duration, ping intervals, IP addresses, etc.
+        results_subfolder (str): Path to the directory where ping results will be stored.
+        latency_data (Dict[str, deque]): Dictionary to store latency data for each IP address.
+
+    Raises:
+        asyncio.CancelledError: If the ping monitoring is cancelled externally.
     """
     duration = config.get("duration", 10800)
     ping_interval = config.get("ping_interval", 1)

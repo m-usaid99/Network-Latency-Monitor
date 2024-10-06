@@ -1,5 +1,17 @@
 # main.py
 
+"""
+Network Latency Monitor (NLM) Main Module
+
+This module serves as the entry point for the NLM tool. It orchestrates the execution flow,
+including argument parsing, configuration loading and validation, logging setup, data clearing,
+IP address validation, ping monitoring initiation, result processing, and output display.
+
+Functions:
+    - main: Asynchronous main function that runs the NLM tool.
+    - cli: Synchronous entry point for the console script.
+"""
+
 import asyncio
 import logging
 import os
@@ -37,6 +49,31 @@ console = Console()
 
 
 async def main():
+    """
+    Asynchronous main function that runs the Network Latency Monitor (NLM) tool.
+
+    This function orchestrates the entire execution flow of the NLM tool, including:
+        - Parsing command-line arguments.
+        - Handling configuration regeneration.
+        - Loading and validating configurations.
+        - Setting up logging.
+        - Handling data clearing operations.
+        - Processing existing ping result files if provided.
+        - Validating IP addresses.
+        - Creating results directory.
+        - Initializing latency data storage.
+        - Starting ping monitoring.
+        - Processing ping results.
+        - Generating plots and displaying summary statistics.
+
+    Raises:
+        SystemExit: If critical errors occur or after certain operations like config regeneration.
+
+    Example:
+        >>> asyncio.run(main())
+        # Starts the NLM tool.
+    """
+
     # Parse command-line arguments
     args = parse_arguments()
 
@@ -98,6 +135,13 @@ async def main():
 def cli():
     """
     Synchronous entry point for the console script.
+
+    This function serves as the main entry point when the NLM tool is invoked from the command line.
+    It handles the asynchronous execution of the main function and manages keyboard interrupts gracefully.
+
+    Example:
+        >>> cli()
+        # Runs the NLM tool from the command line.
     """
     try:
         asyncio.run(main())

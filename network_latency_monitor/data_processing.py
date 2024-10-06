@@ -1,3 +1,20 @@
+# data_processing.py
+
+"""
+Data Processing
+
+Handles the processing of existing ping result files for the Network Latency Monitor (NLM) tool.
+This module provides functions to extract ping times from files, aggregate the data, generate
+visual plots, and process the results based on user configurations.
+
+Functions:
+    - process_file_mode: Processes the ping result file if file mode is enabled.
+    - extract_ping_times: Extracts ping times from a given file.
+    - aggregate_ping_times: Aggregates ping times over specified intervals.
+    - process_ping_results: Processes all ping result files in a subdirectory.
+    - process_ping_file: Processes a single ping result file and generates the corresponding plot.
+"""
+
 import sys
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -10,9 +27,19 @@ from .plot_generator import generate_plots
 console = Console()
 
 
-def process_file_mode(config):
+def process_file_mode(config: Dict):
     """
     Processes the ping result file if file mode is enabled.
+
+    If a file path is provided in the configuration, this function processes the ping results
+    contained within that file. It leverages the `process_ping_file` function to handle the
+    processing based on the current configuration settings, such as aggregation and latency thresholds.
+
+    Args:
+        config (Dict): Configuration dictionary containing settings and file path.
+
+    Raises:
+        SystemExit: Exits the program after processing the file.
     """
     file_path = config.get("file")
     if file_path:
@@ -34,11 +61,23 @@ def process_file_mode(config):
 
 def extract_ping_times(file_path: str) -> List[Optional[float]]:
     """
-    Extracts ping times from a ping result file, caps them at 800 ms,
-    and returns a list of ping times where lost pings are represented as None.
+    Extracts ping times from a given ping result file.
 
-    :param file_path: Path to the ping result file.
-    :return: List of ping times with None for lost pings.
+    This function reads a ping result file line by line, parsing each line to extract
+    the latency in milliseconds. If a ping attempt resulted in a loss or an error,
+    the function records it as `None`. The function also logs any unexpected line formats.
+
+    Args:
+        file_path (str): Path to the ping result file.
+
+    Returns:
+        List[Optional[float]]: A list of ping times in milliseconds. `None` represents
+        lost pings or errors.
+
+    Example:
+        >>> ping_times = extract_ping_times("results/ping_results_8.8.8.8.txt")
+        >>> print(ping_times)
+        [23.5, 24.1, None, 25.0, ...]
     """
     ping_times: List[Optional[float]] = []
 
@@ -71,12 +110,30 @@ def aggregate_ping_times(
     ping_times: List[Optional[float]], interval: int
 ) -> List[Tuple[float, float, float]]:
     """
-    Aggregates ping times over specified intervals and assigns aggregate points at the midpoint of each interval.
+    Aggregates ping times over specified intervals.
 
-    :param ping_times: List of ping times where None represents a lost ping.
-    :param interval: Interval in seconds to aggregate pings.
-    :return: List of tuples containing (Midpoint Time Interval, Mean Latency, Packet Loss Percentage)
+    This function groups ping times into intervals and calculates the mean latency
+    and packet loss percentage for each interval. If all pings in an interval are lost,
+    it logs a warning and sets the mean latency to 0.0 ms.
+
+    Args:
+        ping_times (List[Optional[float]]): A list of ping times in milliseconds. `None` represents
+            lost pings or errors.
+        interval (int): The number of ping attempts to aggregate into a single interval.
+
+    Returns:
+        List[Tuple[float, float, float]]: A list of tuples containing:
+            - Midpoint time of the interval in seconds.
+            - Mean latency in milliseconds.
+            - Packet loss percentage.
+
+    Example:
+        >>> ping_times = [23.5, 24.1, None, 25.0, 26.2, None]
+        >>> aggregated = aggregate_ping_times(ping_times, 3)
+        >>> print(aggregated)
+        [(1.5, 24.2, 33.33333333333333), (4.5, 25.6, 33.33333333333333)]
     """
+
     aggregated_data = []
     total_intervals = len(ping_times) // interval
 
@@ -137,6 +194,26 @@ def aggregate_ping_times(
 def process_ping_results(
     results_subfolder, config
 ) -> Dict[str, Dict[str, pd.DataFrame]]:
+    """
+    Processes all ping result files in a specified subdirectory.
+
+    This function iterates through all ping result files within the provided subdirectory,
+    extracts and aggregates ping times, and organizes the data into pandas DataFrames
+    for further analysis or plotting.
+
+    Args:
+        results_subfolder (str): Path to the directory containing ping result files.
+        config (Dict): Configuration dictionary containing settings like duration and aggregation flags.
+
+    Returns:
+        Dict[str, Dict[str, pd.DataFrame]]: A nested dictionary where each key is an IP address,
+        and its value is another dictionary with 'raw' and 'aggregated' DataFrames.
+
+    Example:
+        >>> data = process_ping_results("results/results_2023-10-05_12-00-00", config)
+        >>> print(data.keys())
+        dict_keys(['8.8.8.8', '1.1.1.1'])
+    """
     data_dict = {}
     ip_files = [
         f
@@ -208,10 +285,20 @@ def process_ping_file(
     """
     Processes a single ping result file and generates the corresponding plot.
 
-    :param file_path: Path to the ping result file.
-    :param config: Configuration dictionary.
-    :param no_aggregation: Boolean flag to disable aggregation.
-    :param duration: Total duration of the ping monitoring in seconds.
+    This function reads ping results from a specified file, extracts and aggregates the
+    data based on configuration settings, and generates visual plots using matplotlib.
+    It also creates a timestamped subdirectory to store the generated plots.
+
+    Args:
+        file_path (str): Path to the ping result file.
+        config (Dict): Configuration dictionary containing settings like aggregation flags and folders.
+        no_aggregation (bool): Flag to disable data aggregation.
+        duration (int): Total duration of the ping monitoring in seconds.
+        latency_threshold (float): Latency threshold in milliseconds for highlighting high latency regions.
+
+    Raises:
+        FileNotFoundError: If the specified ping result file does not exist.
+        Exception: For any other errors that occur during processing.
     """
     ip_address = os.path.basename(file_path).split("_")[2]  # Extract IP from filename
     ping_times = extract_ping_times(file_path)

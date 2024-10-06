@@ -1,13 +1,34 @@
 # cli.py
 
+"""
+Command-Line Interface (CLI)
+
+Handles parsing of command-line arguments for the Network Latency Monitor (NLM) tool.
+This module defines the `parse_arguments` function, which sets up and returns the
+parsed command-line arguments based on the defined options and flags.
+
+Functions:
+    - parse_arguments: Parses and returns command-line arguments.
+"""
+
 import argparse
 
 
 def parse_arguments() -> argparse.Namespace:
     """
-    Parses command-line arguments.
+    Parses command-line arguments for the Network Latency Monitor (NLM) tool.
 
-    :return: Parsed arguments.
+    This function sets up the argument parser with various options and flags that
+    allow users to configure the behavior of the NLM tool. It supports positional
+    arguments for IP addresses and multiple optional arguments for customization.
+
+    Returns:
+        argparse.Namespace: An object containing the parsed command-line arguments.
+
+    Example:
+        >>> args = parse_arguments()
+        >>> print(args.ip_addresses)
+        ['8.8.8.8', '1.1.1.1']
     """
     parser = argparse.ArgumentParser(
         description="NLM: Network Latency Monitor - Monitor and visualize network latency.",
@@ -114,4 +135,3 @@ def parse_arguments() -> argparse.Namespace:
     )
 
     return parser.parse_args()
-
