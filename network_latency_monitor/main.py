@@ -521,13 +521,13 @@ def cli():
     """
     Synchronous entry point for the console script.
     """
-    asyncio.run(main())
-
-
-if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
         console.print("\n[bold red]Ping monitoring interrupted by user.[/bold red]")
         logging.warning("Ping monitoring interrupted by user.")
         sys.exit(0)
+
+
+if __name__ == "__main__":
+    cli()
