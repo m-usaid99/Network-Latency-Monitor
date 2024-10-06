@@ -1,8 +1,16 @@
 # utils.py
 
+from datetime import datetime
+import ipaddress
+import logging
 import os
 import shutil
-import logging
+import sys
+
+from rich.console import Console
+from rich.prompt import Prompt
+
+console = Console()
 
 
 def clear_data(folders_to_clear: list) -> None:
@@ -17,3 +25,100 @@ def clear_data(folders_to_clear: list) -> None:
             logging.info(f"Cleared folder: {folder}")
         else:
             logging.warning(f"Folder not found: {folder}")
+
+
+def ask_confirmation(message: str, auto_confirm: bool) -> bool:
+    """
+    Prompts the user for a yes/no confirmation unless auto_confirm is True.
+    """
+    if auto_confirm:
+        return True
+
+    response = Prompt.ask(f"{message}", choices=["y", "n"], default="n")
+    return response.lower() in ["y", "yes"]
+
+
+def handle_clear_operations(config):
+    """
+    Handles data clearing operations based on configuration flags.
+    """
+    folders_to_clear = []
+    confirmation_message = ""
+
+    # Check if any clear operation is requested
+    if config.get("clear", False):
+        folders_to_clear = [
+            config.get("results_folder", "results"),
+            config.get("plots_folder", "plots"),  # Include plots_folder
+            config.get("log_folder", "logs"),
+        ]
+        confirmation_message = (
+            "Are you sure you want to clear ALL data (results, plots, logs)?"
+        )
+    else:
+        if config.get("clear_results", False):
+            folders_to_clear.append(config.get("results_folder", "results"))
+        if config.get("clear_plots", False):  # Handle clear_plots
+            folders_to_clear.append(config.get("plots_folder", "plots"))
+        if config.get("clear_logs", False):
+            folders_to_clear.append(config.get("log_folder", "logs"))
+        if folders_to_clear:
+            confirmation_message = "[bold yellow]Are you sure you want to clear the selected data?[/bold yellow]"
+
+    if folders_to_clear:
+        if ask_confirmation(confirmation_message, config.get("yes", False)):
+            clear_data(folders_to_clear)
+            console.print(
+                "[bold green]Selected data has been cleared successfully.[/bold green]"
+            )
+            logging.info("Clear operation completed.")
+        else:
+            console.print("[bold yellow]Clear operation canceled.[/bold yellow]")
+            logging.info("Clear operation canceled by user.")
+        sys.exit(0)  # Exit after clearing
+
+
+def validate_and_get_ips(config) -> list:
+    """
+    Validates the list of IP addresses and returns the validated list.
+    """
+    ips = config.get("ip_addresses", ["8.8.8.8"])
+
+    if not ips:
+        default_ip = ["8.8.8.8"]
+        console.print(
+            f"[bold yellow]No IP addresses provided. Using default IP:[/bold yellow] {default_ip[0]}"
+        )
+        logging.info(f"No IP addresses provided. Using default IP: {default_ip[0]}")
+        ips = default_ip
+
+    validated_ips = []
+    for ip in ips:
+        try:
+            ipaddress.ip_address(ip)
+            validated_ips.append(ip)
+        except ValueError:
+            console.print(f"[bold red]Invalid IP address:[/bold red] {ip}")
+            logging.error(f"Invalid IP address provided: {ip}")
+
+    if not validated_ips:
+        console.print("[bold red]No valid IP addresses provided. Exiting.[/bold red]")
+        logging.error("No valid IP addresses provided. Exiting.")
+        sys.exit(1)
+
+    return validated_ips
+
+
+def create_results_directory(config) -> str:
+    """
+    Creates a results subdirectory with a timestamp and returns its path.
+    """
+    results_folder = config.get("results_folder", "results")
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    results_subfolder = os.path.join(results_folder, f"results_{timestamp}")
+    os.makedirs(results_subfolder, exist_ok=True)
+    console.print(
+        f"[bold green]Created results subdirectory:[/bold green] {results_subfolder}"
+    )
+    logging.info(f"Created results subdirectory: {results_subfolder}")
+    return results_subfolder

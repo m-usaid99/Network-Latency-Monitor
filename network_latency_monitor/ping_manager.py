@@ -2,11 +2,29 @@
 
 import asyncio
 import logging
-import sys
+import os
 import re
-from rich.progress import Progress, TaskID
-from typing import Dict
+import sys
 from collections import deque
+from typing import Dict
+
+import asciichartpy
+from rich.columns import Columns
+from rich.console import Console, Group
+from rich.live import Live
+from rich.panel import Panel
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TaskID,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+)
+from rich.text import Text
+
+console = Console()
 
 
 async def run_ping(
@@ -125,3 +143,143 @@ async def run_ping(
     # Ensure the progress bar reaches 100%
     progress.update(task_id, completed=duration)
 
+
+async def run_ping_monitoring(config, results_subfolder, latency_data):
+    """
+    Initiates ping monitoring with progress bars and real-time graphs.
+    """
+    duration = config.get("duration", 10800)
+    ping_interval = config.get("ping_interval", 1)
+    ips = config["ip_addresses"]
+    tasks = []
+
+    # Initialize Rich Progress
+    progress = Progress(
+        SpinnerColumn(),
+        TextColumn("[bold blue]{task.description}"),
+        BarColumn(),
+        "[progress.percentage]{task.percentage:>3.1f}%",
+        TimeElapsedColumn(),
+        TimeRemainingColumn(),
+        console=console,
+        transient=False,
+    )
+
+    # Create tasks for each IP
+    task_id_map = {}
+    for ip in ips:
+        results_file = os.path.join(results_subfolder, f"ping_results_{ip}.txt")
+        task_id = progress.add_task(f"Pinging [cyan]{ip}[/cyan]", total=duration)
+        task_id_map[ip] = task_id
+        task = asyncio.create_task(
+            run_ping(
+                ip_address=ip,
+                duration=duration,
+                interval=ping_interval,
+                results_file=results_file,
+                progress=progress,
+                task_id=task_id,
+                latency_data=latency_data,
+            )
+        )
+        tasks.append(task)
+
+    # Calculate dynamic graph dimensions
+    terminal_width = console.size.width
+    terminal_height = console.size.height
+    reserved_height = 10  # Reserve some lines for margins and other info
+    progress_bar_height = len(ips) * 3  # Approximate progress bar height
+    available_height = terminal_height - reserved_height - progress_bar_height
+    graph_height = (
+        max(5, available_height // len(ips)) if len(ips) > 0 else 5
+    )  # Ensure a minimum height
+
+    # Define a sliding window size
+    window_size = 50  # Number of recent data points to display
+
+    # Start the Live context
+    with Live(console=console, refresh_per_second=4) as live:
+        while not all(task.done() for task in tasks):
+            # Generate ASCII charts
+            charts = []
+            for ip in ips:
+                data = list(latency_data[ip])[-window_size:]
+                current_max = max(data) if data else 100
+                plot_max = max(current_max, 100)  # Ensure plot max is at least 100ms
+
+                # Determine graph width based on number of columns
+                if len(ips) == 1:
+                    graph_width = (
+                        terminal_width - 10
+                    )  # Use most of the terminal width for a single IP
+                elif len(ips) <= 2:
+                    graph_width = (
+                        terminal_width // 2
+                    ) - 10  # Split the terminal width between two IPs
+                else:
+                    graph_width = (
+                        terminal_width // 3
+                    ) - 10  # Adjust as needed for more IPs
+
+                chart = asciichartpy.plot(
+                    data,
+                    {
+                        "height": graph_height,
+                        "min": 0,
+                        "max": plot_max,
+                        "format": "{:>6.1f}",
+                        "padding": 1,
+                        "width": graph_width,
+                    },
+                )
+
+                # Determine color based on current max latency
+                if current_max < 75:
+                    color = "green"
+                elif current_max < 100:
+                    color = "yellow"
+                else:
+                    color = "red"
+
+                colored_chart = f"[{color}]{chart}[/{color}]"
+                charts.append(
+                    Panel(colored_chart, title=f"IP: {ip}", border_style=color)
+                )
+
+            # Organize charts into columns
+            if len(charts) > 1:
+                charts_renderable = Columns(charts, equal=True)
+            else:
+                charts_renderable = (
+                    charts[0]
+                    if charts
+                    else Panel(
+                        "No Data", title="Real-time Latency Graphs", border_style="grey"
+                    )
+                )
+
+            # Create the legend panel with markup enabled
+            legend_text = Text.from_markup(
+                "Legend: [green]Green[/green] < 75ms | [yellow]Yellow[/yellow] 75ms-125ms | [red]Red[/red] > 125ms",
+                style="bold",
+            )
+            legend_panel = Panel(legend_text, border_style="none", expand=False)
+
+            # Combine charts and legend
+            charts_renderable = Group(charts_renderable, legend_panel)
+
+            # Render the progress bars
+            progress_renderable = Panel(
+                progress, title="Ping Progress", border_style="blue", expand=False
+            )
+
+            # Combine progress and charts into a single renderable
+            combined = Group(progress_renderable, charts_renderable)
+
+            # Update the Live display
+            live.update(combined)
+
+            await asyncio.sleep(0.5)  # Adjust the sleep time as needed
+
+        # Wait for all tasks to complete
+        await asyncio.gather(*tasks)

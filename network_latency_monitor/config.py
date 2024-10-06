@@ -2,6 +2,7 @@
 
 import yaml
 import os
+import sys
 from typing import Dict
 from rich.console import Console
 from rich.prompt import Prompt
@@ -98,3 +99,62 @@ def regenerate_default_config(config_file: str = "config.yaml"):
         f"[bold green]Default configuration file regenerated at '{config_file}'. Please review and modify it as needed.[/bold green]"
     )
 
+
+def merge_args_into_config(args, config):
+    """
+    Merges command-line arguments into the configuration dictionary,
+    giving precedence to CLI arguments over config file settings.
+    """
+    # Map CLI argument names to config keys
+    arg_to_config_map = {
+        "duration": "duration",
+        "ping_interval": "ping_interval",
+        "latency_threshold": "latency_threshold",
+        "no_aggregation": "no_aggregation",
+        "no_segmentation": "no_segmentation",
+        "file": "file",
+        "clear": "clear",
+        "clear_results": "clear_results",
+        "clear_plots": "clear_plots",  # Added clear_plots mapping
+        "clear_logs": "clear_logs",
+        "yes": "yes",
+        # Add more mappings if needed
+    }
+
+    for arg_name, config_key in arg_to_config_map.items():
+        arg_value = getattr(args, arg_name, None)
+        if arg_value is not None:
+            config[config_key] = arg_value
+
+    # Handle positional arguments like ip_addresses
+    if args.ip_addresses:
+        config["ip_addresses"] = args.ip_addresses
+
+    return config
+
+
+def validate_config(config):
+    """
+    Validates configuration values.
+    """
+    # Validate duration
+    if not isinstance(config.get("duration"), int) or config["duration"] <= 0:
+        console.print("[bold red]Invalid duration in configuration.[/bold red]")
+        sys.exit(1)
+
+    # Validate ping_interval
+    if not isinstance(config.get("ping_interval"), int) or config["ping_interval"] <= 0:
+        console.print("[bold red]Invalid ping_interval in configuration.[/bold red]")
+        sys.exit(1)
+
+    # Validate latency_threshold
+    if (
+        not isinstance(config.get("latency_threshold"), float)
+        or config["latency_threshold"] <= 0
+    ):
+        console.print(
+            "[bold red]Invalid latency_threshold in configuration.[/bold red]"
+        )
+        sys.exit(1)
+
+    # Add more validations as needed
