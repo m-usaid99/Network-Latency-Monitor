@@ -23,7 +23,7 @@ from datetime import datetime
 import pandas as pd
 import ipaddress
 from network_latency_monitor.cli import parse_arguments
-from network_latency_monitor.config import load_config
+from network_latency_monitor.config import load_config, regenerate_default_config
 from network_latency_monitor.logger import setup_logging
 from network_latency_monitor.ping_manager import run_ping
 from network_latency_monitor.plot_generator import (
@@ -45,8 +45,8 @@ console = Console()
 #       - create documentation
 #       - turn it into publishable package
 #       - try to fix flicker
-#       - make config file work properly
-#       - graceful error handling
+#       - graceful error handling for keyboard interrupt
+#       - add interactivity thru keyboard controls
 
 
 def ask_confirmation(message: str, auto_confirm: bool) -> bool:
@@ -462,8 +462,19 @@ async def main():
     # Parse command-line arguments
     args = parse_arguments()
 
+    # Handle configuration regeneration
+    if args.regen_config:
+        regenerate_default_config()
+        sys.exit(0)
+
     # Load configuration
     config = load_config()
+
+    if not os.path.exists("config.yaml") or os.path.getsize("config.yaml") == 0:
+        console.print(
+            "[bold yellow]A default 'config.yaml' has been created. Please review and modify it as needed before running the tool again.[/bold yellow]"
+        )
+        sys.exit(0)
 
     config = merge_args_into_config(args, config)
     validate_config(config)

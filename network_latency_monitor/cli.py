@@ -67,6 +67,12 @@ def parse_arguments() -> argparse.Namespace:
         help="Generate a single plot for the entire duration without segmentation.",
     )
 
+    optional.add_argument(
+        "--regen-config",
+        action="store_true",
+        help="Regenerate the default config.yaml file.",
+    )
+
     # Aggregation arguments
     aggregation = parser.add_argument_group("Aggregation Options")
 
