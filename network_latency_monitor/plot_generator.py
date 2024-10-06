@@ -239,3 +239,38 @@ def generate_plots(
 
         # Notify the user
         console.print(f"[bold green]Generated plot:[/bold green] {plot_path}")
+
+
+def display_plots_and_summary(data_dict, config):
+    """
+    Generates plots and displays summary statistics if data is available.
+
+    :param data_dict: Dictionary containing ping data for each IP.
+    :param config: Configuration dictionary.
+    """
+    latency_threshold = config.get("latency_threshold", 200.0)
+    no_segmentation = config.get("no_segmentation", False)
+
+    # Generate plots if data is available
+    if data_dict:
+        console.print("[bold blue]Generating plots...[/bold blue]")
+        generate_plots(
+            config=config,
+            data_dict=data_dict,
+            latency_threshold=latency_threshold,
+            no_segmentation=no_segmentation,
+        )
+        console.print("[bold green]Plot generation completed.[/bold green]")
+        logging.info("Plot generation completed.")
+    else:
+        console.print("[bold red]No data available for plotting.[/bold red]")
+        logging.warning("No data available for plotting.")
+
+    # Display summary statistics
+    if data_dict:
+        console.print("[bold blue]Displaying Summary Statistics...[/bold blue]")
+        display_summary(data_dict)
+        logging.info("Summary statistics displayed.")
+    else:
+        console.print("[bold red]No data available for summary statistics.[/bold red]")
+        logging.warning("No data available for summary statistics.")

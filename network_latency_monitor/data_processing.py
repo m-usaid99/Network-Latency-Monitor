@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import os
 import logging
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Dict, Optional
 from rich.console import Console
 from .plot_generator import generate_plots
 
@@ -132,6 +132,70 @@ def aggregate_ping_times(
             )
 
     return aggregated_data
+
+
+def process_ping_results(
+    results_subfolder, config
+) -> Dict[str, Dict[str, pd.DataFrame]]:
+    data_dict = {}
+    ip_files = [
+        f
+        for f in os.listdir(results_subfolder)
+        if f.startswith("ping_results_") and f.endswith(".txt")
+    ]
+
+    for file_name in ip_files:
+        file_path = os.path.join(results_subfolder, file_name)
+        # Extract IP address from filename
+        ip_address = file_name[len("ping_results_") : -len(".txt")]
+        ping_times = extract_ping_times(file_path)
+        if not ping_times:
+            console.print(
+                f"[bold red]No ping times extracted from {file_path}. Skipping.[/bold red]"
+            )
+            logging.warning(f"No ping times extracted from {file_path}. Skipping.")
+            continue
+
+        # Determine if aggregation should be enforced based on duration
+        duration = config.get("duration", 10800)
+        if duration < 60:
+            console.print(
+                f"[bold yellow]Duration ({duration}s) is less than 60 seconds. Aggregation disabled for {ip_address}.[/bold yellow]"
+            )
+            logging.info(
+                f"Duration ({duration}s) is less than 60 seconds. Aggregation disabled for {ip_address}."
+            )
+            aggregate = False
+        else:
+            aggregate = not config.get("no_aggregation", False)
+
+        if aggregate:
+            aggregated_data = aggregate_ping_times(ping_times, interval=60)
+            agg_df: Optional[pd.DataFrame] = pd.DataFrame(
+                aggregated_data,
+                columns=["Time (s)", "Mean Latency (ms)", "Packet Loss (%)"],
+            )
+            # Ensure no NaN values in agg_df
+            agg_df["Mean Latency (ms)"] = agg_df["Mean Latency (ms)"].fillna(0.0)
+            agg_df["Packet Loss (%)"] = agg_df["Packet Loss (%)"].fillna(
+                100.0
+            )  # If packet loss is NaN, assume 100%
+            logging.debug(f"Aggregated data for {ip_address}:\n{agg_df}")
+            logging.info(
+                f"Aggregated {len(aggregated_data)} intervals for {ip_address}."
+            )
+        else:
+            agg_df = None
+
+        # Convert raw ping times to DataFrame
+        raw_df = pd.DataFrame(
+            {"Time (s)": range(1, len(ping_times) + 1), "Ping (ms)": ping_times}
+        )
+
+        # Store data
+        data_dict[ip_address] = {"raw": raw_df, "aggregated": agg_df}
+
+    return data_dict
 
 
 def process_ping_file(
