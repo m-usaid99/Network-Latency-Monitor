@@ -44,8 +44,8 @@ async def run_ping(
     interval: int,
     results_file: str,
     progress: Progress,
-    task_id: TaskID,  # Updated type annotation
-    latency_data: Dict[str, deque],  # Add latency_data parameter
+    task_id: TaskID,
+    latency_data: Dict[str, deque],
 ):
     """
     Executes the ping command for a specific IP address, records latency, and updates progress.
@@ -97,8 +97,8 @@ async def run_ping(
             )
             stdout, stderr = await proc.communicate()
 
-            raw_output = stdout.decode().strip()
-            error_output = stderr.decode().strip()
+            raw_output = stdout.decode("utf-8").strip()
+            error_output = stderr.decode("utf-8").strip()
 
             # Log raw output for debugging
             if error_output:
@@ -117,8 +117,8 @@ async def run_ping(
                 current_latency = None
                 logging.error(f"Ping failed for {ip_address}. Error: {error_output}")
 
-            # Write the result to the file
-            with open(results_file, "a") as f:
+            # Write the result to the file with explicit encoding
+            with open(results_file, "a", encoding="utf-8") as f:
                 if current_latency is not None:
                     f.write(f"{current_latency}\n")
                 else:
@@ -127,8 +127,8 @@ async def run_ping(
         except Exception as e:
             logging.error(f"Exception occurred while pinging {ip_address}: {e}")
             current_latency = None  # Ensure current_latency is defined
-            # Write the error to the file
-            with open(results_file, "a") as f:
+            # Write the error to the file with explicit encoding
+            with open(results_file, "a", encoding="utf-8") as f:
                 f.write(f"Error: {e}\n")
 
         finally:

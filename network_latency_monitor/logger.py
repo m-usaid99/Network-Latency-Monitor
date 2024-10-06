@@ -12,11 +12,11 @@ Functions:
     - setup_logging: Configures logging settings with log rotation and appropriate handlers.
 """
 
-import os
-import sys
 from datetime import datetime
+from pathlib import Path
 import logging
 from logging.handlers import RotatingFileHandler
+import sys
 
 # Define a module-level logger to implement the Singleton pattern
 _logger_initialized = False
@@ -58,10 +58,13 @@ def setup_logging(
         return
 
     try:
-        # Create the log directory if it doesn't exist
-        os.makedirs(log_folder, exist_ok=True)
+        # Create the log directory using pathlib.Path
+        log_dir = Path(log_folder)
+        log_dir.mkdir(parents=True, exist_ok=True)
+
+        # Generate a safe timestamp for the log file name
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        log_file = os.path.join(log_folder, f"nlm_{timestamp}.log")
+        log_file = log_dir / f"nlm_{timestamp}.log"
 
         # Create a custom logger
         logger = logging.getLogger()
@@ -69,12 +72,15 @@ def setup_logging(
 
         # File Handler with log rotation
         file_handler = RotatingFileHandler(
-            log_file, maxBytes=max_bytes, backupCount=backup_count
+            filename=str(log_file),
+            maxBytes=max_bytes,
+            backupCount=backup_count,
+            encoding="utf-8",  # Specify encoding for consistency
         )
         file_handler.setLevel(log_level_file)  # Set file handler level
 
         # Console Handler for critical issues
-        console_handler = logging.StreamHandler()
+        console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setLevel(log_level_console)  # Set console handler level
 
         # Create formatter and add it to the handlers
@@ -98,3 +104,4 @@ def setup_logging(
     except OSError as e:
         print(f"Failed to create log directory '{log_folder}': {e}", file=sys.stderr)
         raise
+

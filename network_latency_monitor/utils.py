@@ -18,9 +18,10 @@ Functions:
 from datetime import datetime
 import ipaddress
 import logging
-import os
 import shutil
 import sys
+from pathlib import Path
+from typing import Dict, List
 
 from rich.console import Console
 from rich.prompt import Prompt
@@ -28,7 +29,7 @@ from rich.prompt import Prompt
 console = Console()
 
 
-def clear_data(folders_to_clear: list) -> None:
+def clear_data(folders_to_clear: List[str]) -> None:
     """
     Removes specified directories and their contents.
 
@@ -43,14 +44,15 @@ def clear_data(folders_to_clear: list) -> None:
         OSError: If a folder cannot be removed due to permission issues or other OS-related errors.
     """
     for folder in folders_to_clear:
+        folder_path = Path(folder)  # Refactored to use pathlib.Path
         try:
-            if os.path.exists(folder):
-                shutil.rmtree(folder)
-                logging.info(f"Cleared folder: {folder}")
+            if folder_path.exists():
+                shutil.rmtree(folder_path)
+                logging.info(f"Cleared folder: {folder_path}")
             else:
-                logging.warning(f"Folder not found: {folder}")
+                logging.warning(f"Folder not found: {folder_path}")
         except OSError as e:
-            logging.error(f"Failed to clear folder '{folder}': {e}")
+            logging.error(f"Failed to clear folder '{folder_path}': {e}")
             raise
 
 
@@ -75,7 +77,7 @@ def ask_confirmation(message: str, auto_confirm: bool) -> bool:
     return response.lower() in ["y", "yes"]
 
 
-def handle_clear_operations(config):
+def handle_clear_operations(config: Dict) -> None:
     """
     Manages data clearing operations based on configuration flags.
 
@@ -125,7 +127,7 @@ def handle_clear_operations(config):
         sys.exit(0)  # Exit after clearing
 
 
-def validate_and_get_ips(config) -> list:
+def validate_and_get_ips(config: Dict) -> List[str]:
     """
     Validates the list of IP addresses and returns the validated list.
 
@@ -168,26 +170,35 @@ def validate_and_get_ips(config) -> list:
     return validated_ips
 
 
-def create_results_directory(config) -> str:
+def create_results_directory(config: Dict) -> str:
     """
-    Processes the ping result file if file mode is enabled.
+    Creates a results subdirectory with a timestamp and returns its path.
 
-    If a file path is provided in the configuration, this function processes the ping results
-    contained within that file. It leverages the `process_ping_file` function to handle the
-    processing based on the current configuration settings, such as aggregation and latency thresholds.
+    This function generates a unique subdirectory within the results directory based on the current timestamp.
+    It ensures that the directory exists and logs the creation.
 
     Args:
-        config (Dict): Configuration dictionary containing settings and file path.
+        config (Dict): Configuration dictionary containing settings and directory paths.
 
-    Raises:
-        SystemExit: Exits the program after processing the file.
+    Returns:
+        str: The path to the created results subdirectory.
     """
     results_folder = config.get("results_folder", "results")
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    results_subfolder = os.path.join(results_folder, f"results_{timestamp}")
-    os.makedirs(results_subfolder, exist_ok=True)
-    console.print(
-        f"[bold green]Created results subdirectory:[/bold green] {results_subfolder}"
-    )
-    logging.info(f"Created results subdirectory: {results_subfolder}")
-    return results_subfolder
+    results_subfolder = Path(results_folder) / f"results_{timestamp}"
+    try:
+        results_subfolder.mkdir(parents=True, exist_ok=True)
+        console.print(
+            f"[bold green]Created results subdirectory:[/bold green] {results_subfolder}"
+        )
+        logging.info(f"Created results subdirectory: {results_subfolder}")
+    except OSError as e:
+        console.print(
+            f"[bold red]Failed to create results subdirectory:[/bold red] {results_subfolder}"
+        )
+        logging.error(
+            f"Failed to create results subdirectory '{results_subfolder}': {e}"
+        )
+        sys.exit(1)
+    return str(results_subfolder)
+

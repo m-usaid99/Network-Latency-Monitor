@@ -15,13 +15,12 @@ Functions:
 """
 
 import logging
-import os
 import matplotlib.pyplot as plt
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta
 import seaborn as sns
 import pandas as pd
 from typing import Dict, Optional
+from pathlib import Path
 from rich.table import Table
 from rich.console import Console
 
@@ -50,7 +49,6 @@ def display_summary(data_dict: dict) -> None:
         ... }
         >>> display_summary(data)
     """
-    console = Console()
     table = Table(title="Ping Summary Statistics")
 
     table.add_column("IP Address", style="cyan", no_wrap=True)
@@ -126,18 +124,29 @@ def generate_plots(
         Exception: For any other errors that occur during plot generation.
     """
     # Retrieve the base plots folder from the configuration
-    plots_folder = config.get("plots_folder", "plots")
+    plots_folder = Path(config.get("plots_folder", "plots"))
 
     # Generate a timestamp for the subdirectory name
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
     # Create a timestamped subdirectory within the plots folder
-    plots_subfolder = os.path.join(plots_folder, f"plots_{timestamp}")
-    os.makedirs(plots_subfolder, exist_ok=True)
-    logging.info(f"Created plots subdirectory: {plots_subfolder}")
+    plots_subfolder = plots_folder / f"plots_{timestamp}"
+    try:
+        plots_subfolder.mkdir(parents=True, exist_ok=True)
+        logging.info(f"Created plots subdirectory: {plots_subfolder}")
+    except OSError as e:
+        logging.error(f"Failed to create plots subdirectory {plots_subfolder}: {e}")
+        console.print(
+            f"[bold red]Failed to create plots subdirectory {plots_subfolder}: {e}[/bold red]"
+        )
+        raise
 
     # Determine the maximum duration based on the data
-    max_duration = max(data["raw"]["Time (s)"].max() for data in data_dict.values())
+    max_duration = max(
+        data["raw"]["Time (s)"].max()
+        for data in data_dict.values()
+        if "Time (s)" in data["raw"]
+    )
     max_duration = int(max_duration)
     logging.info(f"Maximum monitoring duration: {max_duration} seconds")
 
@@ -271,7 +280,7 @@ def generate_plots(
 
         # Define the plot filename with date and time
         plot_filename = f"ping_plot_{timestamp}_{segment_label}.png"
-        plot_path = os.path.join(plots_subfolder, plot_filename)
+        plot_path = plots_subfolder / plot_filename
 
         # Save the plot
         plt.savefig(plot_path)
@@ -324,3 +333,4 @@ def display_plots_and_summary(data_dict, config):
     else:
         console.print("[bold red]No data available for summary statistics.[/bold red]")
         logging.warning("No data available for summary statistics.")
+

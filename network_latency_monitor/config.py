@@ -13,7 +13,7 @@ Functions:
 """
 
 import yaml
-import os
+from pathlib import Path
 import sys
 from typing import Dict
 from rich.console import Console
@@ -47,24 +47,30 @@ def load_config(config_file: str = "config.yaml") -> Dict:
         "yes": False,  # Set to True to auto-confirm prompts
     }
 
-    if os.path.exists(config_file):
-        with open(config_file, "r") as f:
-            try:
+    config_path = Path(config_file)
+
+    if config_path.exists():
+        try:
+            with config_path.open("r", encoding="utf-8") as f:
                 user_config = yaml.safe_load(f) or {}
                 # Merge user_config into default_config
                 config = {**default_config, **user_config}
-            except yaml.YAMLError as e:
-                console.print(
-                    f"[bold red]Error parsing the config file: {e}[/bold red]"
-                )
-                config = default_config
+        except yaml.YAMLError as e:
+            console.print(f"[bold red]Error parsing the config file: {e}[/bold red]")
+            config = default_config
     else:
         # Create config.yaml with default settings
-        with open(config_file, "w") as f:
-            yaml.dump(default_config, f, sort_keys=False)
-        console.print(
-            f"[bold green]Default configuration file created at '{config_file}'. Please review and modify it as needed.[/bold green]"
-        )
+        try:
+            with config_path.open("w", encoding="utf-8") as f:
+                yaml.dump(default_config, f, sort_keys=False)
+            console.print(
+                f"[bold green]Default configuration file created at '{config_path}'. Please review and modify it as needed.[/bold green]"
+            )
+        except Exception as e:
+            console.print(
+                f"[bold red]Failed to create default config file '{config_path}': {e}[/bold red]"
+            )
+            sys.exit(1)
         config = default_config
 
     return config
@@ -76,10 +82,11 @@ def regenerate_default_config(config_file: str = "config.yaml"):
 
     :param config_file: Path to the config file.
     """
-    if os.path.exists(config_file):
+    config_path = Path(config_file)
+    if config_path.exists():
         # Prompt for confirmation
         confirmation = Prompt.ask(
-            f"[bold yellow]Are you sure you want to regenerate the default '{config_file}'? This will overwrite your current configuration.[/bold yellow]",
+            f"[bold yellow]Are you sure you want to regenerate the default '{config_path}'? This will overwrite your current configuration.[/bold yellow]",
             choices=["y", "n"],
             default="n",
         )
@@ -105,11 +112,17 @@ def regenerate_default_config(config_file: str = "config.yaml"):
         "yes": False,  # Set to True to auto-confirm prompts
     }
 
-    with open(config_file, "w") as f:
-        yaml.dump(default_config, f, sort_keys=False)
-    console.print(
-        f"[bold green]Default configuration file regenerated at '{config_file}'. Please review and modify it as needed.[/bold green]"
-    )
+    try:
+        with config_path.open("w", encoding="utf-8") as f:
+            yaml.dump(default_config, f, sort_keys=False)
+        console.print(
+            f"[bold green]Default configuration file regenerated at '{config_path}'. Please review and modify it as needed.[/bold green]"
+        )
+    except Exception as e:
+        console.print(
+            f"[bold red]Failed to regenerate config file '{config_path}': {e}[/bold red]"
+        )
+        sys.exit(1)
 
 
 def merge_args_into_config(args, config):
@@ -127,7 +140,6 @@ def merge_args_into_config(args, config):
         "file": "file",
         "clear": "clear",
         "clear_results": "clear_results",
-        "clear_plots": "clear_plots",  # Added clear_plots mapping
         "clear_logs": "clear_logs",
         "yes": "yes",
         # Add more mappings if needed
@@ -139,7 +151,7 @@ def merge_args_into_config(args, config):
             config[config_key] = arg_value
 
     # Handle positional arguments like ip_addresses
-    if args.ip_addresses:
+    if hasattr(args, "ip_addresses") and args.ip_addresses:
         config["ip_addresses"] = args.ip_addresses
 
     return config
@@ -169,4 +181,20 @@ def validate_config(config):
         )
         sys.exit(1)
 
+    # Validate results_folder and log_folder paths
+    for folder_key in ["results_folder", "log_folder"]:
+        folder_path = Path(config.get(folder_key, ""))
+        if not folder_path.is_dir() and config.get(folder_key, ""):
+            try:
+                folder_path.mkdir(parents=True, exist_ok=True)
+                console.print(
+                    f"[bold green]Created missing folder '{folder_path}' for '{folder_key}'.[/bold green]"
+                )
+            except Exception as e:
+                console.print(
+                    f"[bold red]Failed to create folder '{folder_path}' for '{folder_key}': {e}[/bold red]"
+                )
+                sys.exit(1)
+
     # Add more validations as needed
+

@@ -18,9 +18,9 @@ Functions:
 import sys
 import matplotlib.pyplot as plt
 import pandas as pd
-import os
 import logging
 from typing import List, Tuple, Dict, Optional
+from pathlib import Path
 from rich.console import Console
 from .plot_generator import generate_plots
 
@@ -43,12 +43,15 @@ def process_file_mode(config: Dict):
     """
     file_path = config.get("file")
     if file_path:
+        file_path_obj = Path(file_path)  # Convert to Path object for path operations
         console.print(
-            f"[bold green]Processing ping result file:[/bold green] {file_path}"
+            f"[bold green]Processing ping result file:[/bold green] {file_path_obj}"
         )
-        logging.info(f"Processing ping result file: {file_path}")
+        logging.info(f"Processing ping result file: {file_path_obj}")
         process_ping_file(
-            file_path=file_path,
+            file_path=str(
+                file_path_obj
+            ),  # Pass as string to maintain original function signature
             config=config,
             no_aggregation=config.get("no_aggregation", False),
             duration=config.get("duration", 10800),
@@ -80,9 +83,10 @@ def extract_ping_times(file_path: str) -> List[Optional[float]]:
         [23.5, 24.1, None, 25.0, ...]
     """
     ping_times: List[Optional[float]] = []
+    file_path_obj = Path(file_path)
 
     try:
-        with open(file_path, "r") as file:
+        with file_path_obj.open("r", encoding="utf-8") as file:
             for line in file:
                 line = line.strip()
                 if line.lower() == "lost":
@@ -95,13 +99,13 @@ def extract_ping_times(file_path: str) -> List[Optional[float]]:
                         # Handle unexpected line format
                         ping_times.append(None)
                         logging.warning(
-                            f"Unexpected line format in {file_path}: {line}"
+                            f"Unexpected line format in {file_path_obj}: {line}"
                         )
-        logging.info(f"Extracted {len(ping_times)} ping attempts from {file_path}")
+        logging.info(f"Extracted {len(ping_times)} ping attempts from {file_path_obj}")
     except FileNotFoundError:
-        logging.error(f"Ping result file {file_path} not found.")
+        logging.error(f"Ping result file {file_path_obj} not found.")
     except Exception as e:
-        logging.error(f"Error extracting ping times from {file_path}: {e}")
+        logging.error(f"Error extracting ping times from {file_path_obj}: {e}")
 
     return ping_times
 
@@ -215,22 +219,26 @@ def process_ping_results(
         dict_keys(['8.8.8.8', '1.1.1.1'])
     """
     data_dict = {}
+    results_subfolder_path = Path(results_subfolder)
+
     ip_files = [
         f
-        for f in os.listdir(results_subfolder)
-        if f.startswith("ping_results_") and f.endswith(".txt")
+        for f in results_subfolder_path.iterdir()
+        if f.is_file() and f.name.startswith("ping_results_") and f.suffix == ".txt"
     ]
 
-    for file_name in ip_files:
-        file_path = os.path.join(results_subfolder, file_name)
+    for file_path_obj in ip_files:
+        file_path = str(
+            file_path_obj
+        )  # Convert Path object back to string for compatibility
         # Extract IP address from filename
-        ip_address = file_name[len("ping_results_") : -len(".txt")]
+        ip_address = file_path_obj.stem[len("ping_results_") :]
         ping_times = extract_ping_times(file_path)
         if not ping_times:
             console.print(
-                f"[bold red]No ping times extracted from {file_path}. Skipping.[/bold red]"
+                f"[bold red]No ping times extracted from {file_path_obj}. Skipping.[/bold red]"
             )
-            logging.warning(f"No ping times extracted from {file_path}. Skipping.")
+            logging.warning(f"No ping times extracted from {file_path_obj}. Skipping.")
             continue
 
         # Determine if aggregation should be enforced based on duration
@@ -300,7 +308,7 @@ def process_ping_file(
         FileNotFoundError: If the specified ping result file does not exist.
         Exception: For any other errors that occur during processing.
     """
-    ip_address = os.path.basename(file_path).split("_")[2]  # Extract IP from filename
+    ip_address = Path(file_path).stem.split("_")[2]  # Extract IP from filename
     ping_times = extract_ping_times(file_path)
 
     if not ping_times:
@@ -319,7 +327,8 @@ def process_ping_file(
     if aggregate:
         aggregated_data = aggregate_ping_times(ping_times, interval=60)
         agg_df = pd.DataFrame(
-            aggregated_data, columns=["Time (s)", "Mean Latency (ms)"]
+            aggregated_data,
+            columns=["Time (s)", "Mean Latency (ms)", "Packet Loss (%)"],
         )
     else:
         agg_df = None
@@ -348,12 +357,20 @@ def process_ping_file(
     # Prepare data dictionary
     data_dict = {ip_address: {"raw": raw_df, "aggregated": agg_df}}
 
-    # Create plot subdirectory
-    plots_folder = config.get("plots_folder", "plots")
+    # Create plot subdirectory using pathlib.Path
+    plots_folder = Path(config.get("plots_folder", "plots"))
     current_date = pd.Timestamp.now().strftime("%Y-%m-%d_%H-%M-%S")
-    plot_subfolder = os.path.join(plots_folder, f"plots_{current_date}")
-    os.makedirs(plot_subfolder, exist_ok=True)
-    logging.info(f"Created plot subdirectory: {plot_subfolder}")
+    plot_subfolder = plots_folder / f"plots_{current_date}"
+    try:
+        plot_subfolder.mkdir(parents=True, exist_ok=True)
+        logging.info(f"Created plot subdirectory: {plot_subfolder}")
+    except Exception as e:
+        logging.error(f"Failed to create plot subdirectory {plot_subfolder}: {e}")
+        console.print(
+            f"[bold red]Failed to create plot subdirectory {plot_subfolder}: {e}[/bold red]"
+        )
+        sys.exit(1)
 
     # Generate and save the plot
     generate_plots(config, data_dict, latency_threshold)
+
