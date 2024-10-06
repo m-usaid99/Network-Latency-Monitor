@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "network-latency-monitor"
+version = "0.1.0"
+description = "Monitor your network latency using real-time plots and cumulative plots"
+authors = ["Muhammad Usaid Rehman <rehman.usaid@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+rich = "^13.9.2"
+asciichartpy = "^1.5.25"
+pandas = "^2.2.3"
+seaborn = "^0.13.2"
+matplotlib = "^3.9.2"
+ipaddress = "^1.0.23"
+pyyaml = "^6.0.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+network-latency-monitor = "network_latency_monitor.main:cli"
+

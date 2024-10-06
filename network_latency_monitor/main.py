@@ -16,34 +16,32 @@ from rich.progress import (
     TimeElapsedColumn,
     TimeRemainingColumn,
 )
+from rich.live import Live
+from rich.text import Text
+from rich.panel import Panel
 from datetime import datetime
 import pandas as pd
 import ipaddress
-
-from cli import parse_arguments
-from config import load_config
-from logger import setup_logging
-from ping_manager import run_ping
-from plot_generator import (
+from network_latency_monitor.cli import parse_arguments
+from network_latency_monitor.config import load_config
+from network_latency_monitor.logger import setup_logging
+from network_latency_monitor.ping_manager import run_ping
+from network_latency_monitor.plot_generator import (
     extract_ping_times,
     aggregate_ping_times,
     generate_plots,
     process_ping_file,
     display_summary,
 )
-from utils import clear_data
+from network_latency_monitor.utils import clear_data
 from typing import Dict, Optional
 import asciichartpy
 from collections import deque
-from rich.live import Live
-from rich.text import Text
-from rich.panel import Panel
 
 # Initialize Rich Console
 console = Console()
 
-# TODO: - fix graph bug (ylim not proper)
-#       - update legend in tui
+# TODO: - update legend in tui
 #       - try to fix flicker
 #       - turn it into publishable package
 #       - create documentation
@@ -282,7 +280,7 @@ async def run_ping_monitoring(args, config, results_subfolder, latency_data):
 
             # Create the legend panel with markup enabled
             legend_text = Text.from_markup(
-                "Legend: [green]Green[/green] < 50ms | [yellow]Yellow[/yellow] 50ms-80ms | [red]Red[/red] > 80ms",
+                "Legend: [green]Green[/green] < 75ms | [yellow]Yellow[/yellow] 75ms-125ms | [red]Red[/red] > 125ms",
                 style="bold",
             )
             legend_panel = Panel(legend_text, border_style="none", expand=False)
@@ -448,6 +446,13 @@ async def main():
 
     # Generate plots and display summary statistics
     display_plots_and_summary(args, data_dict, config)
+
+
+def cli():
+    """
+    Synchronous entry point for the console script.
+    """
+    asyncio.run(main())
 
 
 if __name__ == "__main__":

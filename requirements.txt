@@ -1,0 +1,7 @@
+rich
+matplotlib
+seaborn
+pandas
+ipaddress
+asciichartpy
+
