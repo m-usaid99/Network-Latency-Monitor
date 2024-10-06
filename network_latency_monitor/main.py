@@ -8,24 +8,20 @@ from collections import deque
 
 from rich.console import Console
 
-from network_latency_monitor.cli import parse_arguments
-from network_latency_monitor.config import (
+from network_latency_monitor import (
+    create_results_directory,
+    display_plots_and_summary,
+    handle_clear_operations,
     load_config,
     merge_args_into_config,
-    regenerate_default_config,
-    validate_config,
-)
-from network_latency_monitor.data_processing import (
+    parse_arguments,
     process_file_mode,
     process_ping_results,
-)
-from network_latency_monitor.logger import setup_logging
-from network_latency_monitor.ping_manager import run_ping_monitoring
-from network_latency_monitor.plot_generator import display_plots_and_summary
-from network_latency_monitor.utils import (
-    handle_clear_operations,
-    create_results_directory,
+    regenerate_default_config,
+    run_ping_monitoring,
+    setup_logging,
     validate_and_get_ips,
+    validate_config,
 )
 
 # Initialize Rich Console
