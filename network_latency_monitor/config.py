@@ -8,25 +8,22 @@ def load_config(config_file="config.yaml"):
     # Default configuration values
     default_config = {
         "duration": 10800,
-        "ip_address": "8.8.8.8",
+        "ip_addresses": ["8.8.8.8"],
         "ping_interval": 1,
-        "aggregation_interval": 60,
-        "plot": {
-            "figure_size": [20, 15],
-            "dpi": 100,
-            "theme": "darkgrid",
-            "font": {
-                "title_size": 24,
-                "label_size": 22,
-                "tick_size": 20,
-                "legend_size": 20,
-            },
+        "aggregation": {
+            "method": "mean",
+            "interval": 60,
         },
-        "aggregation": {"method": "mean", "interval": 60},
-        "segmentation": {"hourly": True},
+        "segmentation": True,
         "results_folder": "results",
-        "plots_folder": "plots",
         "log_folder": "logs",
+        "file": None,  # Added default
+        "no_aggregation": False,
+        "no_segmentation": False,
+        "clear": False,
+        "clear_results": False,
+        "clear_logs": False,
+        "yes": False,
     }
 
     if os.path.exists(config_file):

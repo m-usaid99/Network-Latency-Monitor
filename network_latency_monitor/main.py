@@ -46,6 +46,7 @@ console = Console()
 #       - turn it into publishable package
 #       - try to fix flicker
 #       - make config file work properly
+#       - graceful error handling
 
 
 def ask_confirmation(message: str, auto_confirm: bool) -> bool:
@@ -59,34 +60,86 @@ def ask_confirmation(message: str, auto_confirm: bool) -> bool:
     return response.lower() in ["y", "yes"]
 
 
-def handle_clear_operations(args, config):
+def merge_args_into_config(args, config):
+    """
+    Merges command-line arguments into the configuration dictionary,
+    giving precedence to CLI arguments over config file settings.
+    """
+    # Map CLI argument names to config keys
+    arg_to_config_map = {
+        "duration": "duration",
+        "ping_interval": "ping_interval",
+        "latency_threshold": "latency_threshold",
+        "no_aggregation": "no_aggregation",
+        "no_segmentation": "no_segmentation",
+        # Add more mappings if needed
+    }
+
+    for arg_name, config_key in arg_to_config_map.items():
+        arg_value = getattr(args, arg_name, None)
+        if arg_value is not None:
+            config[config_key] = arg_value
+
+    # Handle positional arguments like ip_addresses
+    if args.ip_addresses:
+        config["ip_addresses"] = args.ip_addresses
+
+    return config
+
+
+def validate_config(config):
+    """
+    Validates configuration values.
+    """
+    # Validate duration
+    if not isinstance(config.get("duration"), int) or config["duration"] <= 0:
+        console.print("[bold red]Invalid duration in configuration.[/bold red]")
+        sys.exit(1)
+
+    # Validate ping_interval
+    if not isinstance(config.get("ping_interval"), int) or config["ping_interval"] <= 0:
+        console.print("[bold red]Invalid ping_interval in configuration.[/bold red]")
+        sys.exit(1)
+
+    # Validate latency_threshold
+    if (
+        not isinstance(config.get("latency_threshold"), float)
+        or config["latency_threshold"] <= 0
+    ):
+        console.print(
+            "[bold red]Invalid latency_threshold in configuration.[/bold red]"
+        )
+        sys.exit(1)
+
+    # Add more validations as needed
+
+
+def handle_clear_operations(config):
     """
     Handles data clearing operations based on command-line arguments.
     """
     folders_to_clear = []
     confirmation_message = ""
 
-    if args.clear:
+    # Assuming you have flags in config for clear operations
+    if config.get("clear"):
         folders_to_clear = [
             config.get("results_folder", "results"),
-            config.get("plots_folder", "plots"),
             config.get("log_folder", "logs"),
         ]
         confirmation_message = (
-            "Are you sure you want to clear ALL data (results, plots, logs)?"
+            "Are you sure you want to clear ALL data (results, logs)?"
         )
     else:
-        if args.clear_results:
+        if config.get("clear_results"):
             folders_to_clear.append(config.get("results_folder", "results"))
-        if args.clear_plots:
-            folders_to_clear.append(config.get("plots_folder", "plots"))
-        if args.clear_logs:
+        if config.get("clear_logs"):
             folders_to_clear.append(config.get("log_folder", "logs"))
         confirmation_message = "Are you sure you want to clear the selected data?"
 
     if folders_to_clear:
-        if ask_confirmation(confirmation_message, args.yes):
-            clear_data(args, config)
+        if ask_confirmation(confirmation_message, config.get("yes", False)):
+            clear_data(folders_to_clear)
             console.print(
                 "[bold green]Selected data has been cleared successfully.[/bold green]"
             )
@@ -97,39 +150,41 @@ def handle_clear_operations(args, config):
         sys.exit(0)  # Exit after clearing
 
 
-def process_file_mode(args, config):
+def process_file_mode(config):
     """
     Processes the ping result file if file mode is enabled.
     """
-    if args.file:
+    file_path = config.get("file")
+    if file_path:
         console.print(
-            f"[bold green]Processing ping result file:[/bold green] {args.file}"
+            f"[bold green]Processing ping result file:[/bold green] {file_path}"
         )
-        logging.info(f"Processing ping result file: {args.file}")
+        logging.info(f"Processing ping result file: {file_path}")
         process_ping_file(
-            file_path=args.file,
+            file_path=file_path,
             config=config,
-            no_aggregation=args.no_aggregation,
-            duration=args.duration,
-            latency_threshold=args.latency_threshold,
+            no_aggregation=config.get("no_aggregation", False),
+            duration=config.get("duration", 10800),
+            latency_threshold=config.get("latency_threshold", 200.0),
         )
         console.print("[bold green]Processing of ping file completed.[/bold green]")
         logging.info("Processing of ping file completed.")
         sys.exit(0)  # Exit after processing file
 
 
-def validate_and_get_ips(args, config) -> list:
+def validate_and_get_ips(config) -> list:
     """
     Validates the list of IP addresses and returns the validated list.
     """
-    ips = args.ip_addresses or [config.get("ip_address", "8.8.8.8")]
+    ips = config.get("ip_addresses", ["8.8.8.8"])
 
-    if not args.ip_addresses:
-        default_ip = config.get("ip_address", "8.8.8.8")
+    if not ips:
+        default_ip = ["8.8.8.8"]
         console.print(
-            f"[bold yellow]No IP addresses provided. Using default IP:[/bold yellow] {default_ip}"
+            f"[bold yellow]No IP addresses provided. Using default IP:[/bold yellow] {default_ip[0]}"
         )
-        logging.info(f"No IP addresses provided. Using default IP: {default_ip}")
+        logging.info(f"No IP addresses provided. Using default IP: {default_ip[0]}")
+        ips = default_ip
 
     validated_ips = []
     for ip in ips:
@@ -163,13 +218,13 @@ def create_results_directory(config) -> str:
     return results_subfolder
 
 
-async def run_ping_monitoring(args, config, results_subfolder, latency_data):
+async def run_ping_monitoring(config, results_subfolder, latency_data):
     """
     Initiates ping monitoring with progress bars and real-time graphs.
     """
-    duration = args.duration
-    ping_interval = args.ping_interval
-    ips = args.ip_addresses
+    duration = config.get("duration", 10800)
+    ping_interval = config.get("ping_interval", 1)
+    ips = config["ip_addresses"]
     tasks = []
 
     # Initialize Rich Progress
@@ -306,7 +361,9 @@ async def run_ping_monitoring(args, config, results_subfolder, latency_data):
         await asyncio.gather(*tasks)
 
 
-def process_ping_results(results_subfolder, args) -> Dict[str, Dict[str, pd.DataFrame]]:
+def process_ping_results(
+    results_subfolder, config
+) -> Dict[str, Dict[str, pd.DataFrame]]:
     data_dict = {}
     ip_files = [
         f
@@ -327,16 +384,17 @@ def process_ping_results(results_subfolder, args) -> Dict[str, Dict[str, pd.Data
             continue
 
         # Determine if aggregation should be enforced based on duration
-        if args.duration < 60:
+        duration = config.get("duration", 10800)
+        if duration < 60:
             console.print(
-                f"[bold yellow]Duration ({args.duration}s) is less than 60 seconds. Aggregation disabled for {ip_address}.[/bold yellow]"
+                f"[bold yellow]Duration ({duration}s) is less than 60 seconds. Aggregation disabled for {ip_address}.[/bold yellow]"
             )
             logging.info(
-                f"Duration ({args.duration}s) is less than 60 seconds. Aggregation disabled for {ip_address}."
+                f"Duration ({duration}s) is less than 60 seconds. Aggregation disabled for {ip_address}."
             )
             aggregate = False
         else:
-            aggregate = not args.no_aggregation
+            aggregate = not config.get("no_aggregation", False)
 
         if aggregate:
             aggregated_data = aggregate_ping_times(ping_times, interval=60)
@@ -367,16 +425,15 @@ def process_ping_results(results_subfolder, args) -> Dict[str, Dict[str, pd.Data
     return data_dict
 
 
-def display_plots_and_summary(args, data_dict, config):
+def display_plots_and_summary(data_dict, config):
     """
     Generates plots and displays summary statistics if data is available.
 
-    :param args: Command-line arguments.
     :param data_dict: Dictionary containing ping data for each IP.
     :param config: Configuration dictionary.
     """
-    latency_threshold = args.latency_threshold
-    no_segmentation = args.no_segmentation
+    latency_threshold = config.get("latency_threshold", 200.0)
+    no_segmentation = config.get("no_segmentation", False)
 
     # Generate plots if data is available
     if data_dict:
@@ -410,6 +467,8 @@ async def main():
     # Load configuration
     config = load_config()
 
+    config = merge_args_into_config(args, config)
+    validate_config(config)
     # Setup logging (logs are written to files only)
     setup_logging(config.get("log_folder", "logs"))
 
@@ -418,13 +477,13 @@ async def main():
     logging.info(f"Arguments: {args}")
 
     # Handle clear operations if any
-    handle_clear_operations(args, config)
+    handle_clear_operations(config)
 
     # If file mode is enabled, process the file directly
-    process_file_mode(args, config)
+    process_file_mode(config)
 
     # Validate IP addresses
-    args.ip_addresses = validate_and_get_ips(args, config)
+    config["ip_addresses"] = validate_and_get_ips(config)
 
     # Create results subdirectory with timestamp
     results_subfolder = create_results_directory(config)
@@ -438,15 +497,15 @@ async def main():
 
     # Start ping monitoring with enhanced progress bars and real-time charts
     console.print("[bold blue]Starting ping monitoring...[/bold blue]")
-    await run_ping_monitoring(args, config, results_subfolder, latency_data)
+    await run_ping_monitoring(config, results_subfolder, latency_data)
     console.print("[bold green]Ping monitoring completed.[/bold green]")
     logging.info("All ping tasks completed.")
 
     # Process ping results
-    data_dict = process_ping_results(results_subfolder, args)
+    data_dict = process_ping_results(results_subfolder, config)
 
     # Generate plots and display summary statistics
-    display_plots_and_summary(args, data_dict, config)
+    display_plots_and_summary(data_dict, config)
 
 
 def cli():
