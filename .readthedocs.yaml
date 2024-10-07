@@ -1,0 +1,31 @@
+# .readthedocs.yaml
+
+version: 2
+
+# Build settings
+build:
+  os: ubuntu-22.04
+  tools:
+    python: "3.10"  # Python version you're using in your project
+
+# Python dependency management
+python:
+  install:
+    - method: pip 
+      path: .
+      requirements: poetry.lock
+    - requirements: docs/requirements.txt  # Ensure this file exists for extra dependencies (Sphinx extensions, etc.)
+
+# Sphinx documentation builder
+sphinx:
+  configuration: docs/conf.py
+
+# Optionally set the default branch
+# To specify a branch other than `main` or `master` for building
+#defaults:
+#  root: docs  # path to where the Sphinx conf.py is, usually 'docs'
+
+# Environment variables (if needed)
+# environment:
+#   MY_VAR: value
+
