@@ -9,6 +9,15 @@ documentation = "https://network-latency-monitor.readthedocs.io/en/latest/"
 readme = "README.md"
 license = "MIT"
 
+
+# Include other metadata as needed
+keywords = ["network", "latency", "monitoring", "ping"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
 [tool.poetry.dependencies]
 python = "^3.10"
 rich = "^13.9.2"

@@ -37,9 +37,8 @@ from rich.console import Console
 console = Console()
 
 # TODO:
-#       - create documentation
-#       - generate docs thru sphinx
 #       - redo Readme
+#       - refine docs whenever possible
 #       - turn it into publishable package (half-done)
 
 
