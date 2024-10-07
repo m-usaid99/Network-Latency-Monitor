@@ -39,6 +39,7 @@ def load_config(config_file: str = "config.yaml") -> Dict:
         "no_aggregation": False,
         "no_segmentation": False,
         "results_folder": "results",
+        "plots_folder": "plots",
         "log_folder": "logs",
         "file": None,  # Optional: Specify a ping result file to process
         "clear": False,  # Set to True to clear all data
@@ -104,6 +105,7 @@ def regenerate_default_config(config_file: str = "config.yaml"):
         "no_aggregation": False,
         "no_segmentation": False,
         "results_folder": "results",
+        "plots_folder": "plots",
         "log_folder": "logs",
         "file": None,  # Optional: Specify a ping result file to process
         "clear": False,  # Set to True to clear all data
@@ -125,7 +127,7 @@ def regenerate_default_config(config_file: str = "config.yaml"):
         sys.exit(1)
 
 
-def merge_args_into_config(args, config):
+def merge_args_into_config(args, config: Dict) -> Dict:
     """
     Merges command-line arguments into the configuration dictionary,
     giving precedence to CLI arguments over config file settings.
@@ -157,7 +159,7 @@ def merge_args_into_config(args, config):
     return config
 
 
-def validate_config(config):
+def validate_config(config: Dict) -> None:
     """
     Validates configuration values.
     """
@@ -181,8 +183,8 @@ def validate_config(config):
         )
         sys.exit(1)
 
-    # Validate results_folder and log_folder paths
-    for folder_key in ["results_folder", "log_folder"]:
+    # Validate results_folder, plots_folder, and log_folder paths
+    for folder_key in ["results_folder", "plots_folder", "log_folder"]:
         folder_path = Path(config.get(folder_key, ""))
         if not folder_path.is_dir() and config.get(folder_key, ""):
             try:
@@ -197,4 +199,3 @@ def validate_config(config):
                 sys.exit(1)
 
     # Add more validations as needed
-

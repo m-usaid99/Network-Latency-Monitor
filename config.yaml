@@ -6,6 +6,7 @@ latency_threshold: 200.0
 no_aggregation: false
 no_segmentation: false
 results_folder: results
+plots_folder: plots
 log_folder: logs
 file: null
 clear: false

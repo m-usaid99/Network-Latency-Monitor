@@ -44,7 +44,6 @@ console = Console()
 #       - generate docs thru sphinx
 #       - redo Readme
 #       - turn it into publishable package (half-done)
-#       - cross OS compabitibility
 #       - check plot path in config
 #       - figure out filepath where shit is saved
 
