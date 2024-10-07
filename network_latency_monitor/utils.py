@@ -29,7 +29,7 @@ from rich.prompt import Prompt
 console = Console()
 
 
-def clear_data(folders_to_clear: List[str]) -> None:
+def clear_data(folders_to_clear: List[Path]) -> None:
     """
     Removes specified directories and their contents.
 
@@ -38,17 +38,15 @@ def clear_data(folders_to_clear: List[str]) -> None:
     the folder was successfully cleared or if it was not found.
 
     Args:
-        folders_to_clear (List[str]): A list of directory paths to be removed.
+        folders_to_clear (List[Path]): A list of directory paths to be removed.
 
     Raises:
         OSError: If a folder cannot be removed due to permission issues or other OS-related errors.
     """
-    for folder in folders_to_clear:
-        folder_path = Path(folder)  # Refactored to use pathlib.Path
+    for folder_path in folders_to_clear:
         try:
             if folder_path.exists():
                 shutil.rmtree(folder_path)
-                logging.info(f"Cleared folder: {folder_path}")
             else:
                 logging.warning(f"Folder not found: {folder_path}")
         except OSError as e:
@@ -97,22 +95,25 @@ def handle_clear_operations(config: Dict) -> None:
     # Check if any clear operation is requested
     if config.get("clear", False):
         folders_to_clear = [
-            config.get("results_folder", "results"),
-            config.get("plots_folder", "plots"),  # Include plots_folder
-            config.get("log_folder", "logs"),
+            config.get("results_dir"),
+            config.get("plots_dir"),
+            config.get("log_dir"),
         ]
         confirmation_message = (
             "Are you sure you want to clear ALL data (results, plots, logs)?"
         )
     else:
         if config.get("clear_results", False):
-            folders_to_clear.append(config.get("results_folder", "results"))
-        if config.get("clear_plots", False):  # Handle clear_plots
-            folders_to_clear.append(config.get("plots_folder", "plots"))
+            folders_to_clear.append(config.get("results_dir"))
+        if config.get("clear_plots", False):
+            folders_to_clear.append(config.get("plots_dir"))
         if config.get("clear_logs", False):
-            folders_to_clear.append(config.get("log_folder", "logs"))
+            folders_to_clear.append(config.get("log_dir"))
         if folders_to_clear:
             confirmation_message = "[bold yellow]Are you sure you want to clear the selected data?[/bold yellow]"
+
+    # Convert folder paths to Path objects
+    folders_to_clear = [Path(folder) for folder in folders_to_clear if folder]
 
     if folders_to_clear:
         if ask_confirmation(confirmation_message, config.get("yes", False)):
@@ -120,10 +121,8 @@ def handle_clear_operations(config: Dict) -> None:
             console.print(
                 "[bold green]Selected data has been cleared successfully.[/bold green]"
             )
-            logging.info("Clear operation completed.")
         else:
             console.print("[bold yellow]Clear operation canceled.[/bold yellow]")
-            logging.info("Clear operation canceled by user.")
         sys.exit(0)  # Exit after clearing
 
 
@@ -150,7 +149,6 @@ def validate_and_get_ips(config: Dict) -> List[str]:
         console.print(
             f"[bold yellow]No IP addresses provided. Using default IP:[/bold yellow] {default_ip[0]}"
         )
-        logging.info(f"No IP addresses provided. Using default IP: {default_ip[0]}")
         ips = default_ip
 
     validated_ips = []
@@ -170,7 +168,7 @@ def validate_and_get_ips(config: Dict) -> List[str]:
     return validated_ips
 
 
-def create_results_directory(config: Dict) -> str:
+def create_results_directory(config: Dict) -> Path:
     """
     Creates a results subdirectory with a timestamp and returns its path.
 
@@ -181,17 +179,16 @@ def create_results_directory(config: Dict) -> str:
         config (Dict): Configuration dictionary containing settings and directory paths.
 
     Returns:
-        str: The path to the created results subdirectory.
+        Path: The path to the created results subdirectory.
     """
-    results_folder = config.get("results_folder", "results")
+    results_dir = Path(config.get("results_dir"))
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    results_subfolder = Path(results_folder) / f"results_{timestamp}"
+    results_subfolder = results_dir / f"results_{timestamp}"
     try:
         results_subfolder.mkdir(parents=True, exist_ok=True)
         console.print(
             f"[bold green]Created results subdirectory:[/bold green] {results_subfolder}"
         )
-        logging.info(f"Created results subdirectory: {results_subfolder}")
     except OSError as e:
         console.print(
             f"[bold red]Failed to create results subdirectory:[/bold red] {results_subfolder}"
@@ -200,5 +197,5 @@ def create_results_directory(config: Dict) -> str:
             f"Failed to create results subdirectory '{results_subfolder}': {e}"
         )
         sys.exit(1)
-    return str(results_subfolder)
+    return results_subfolder
 

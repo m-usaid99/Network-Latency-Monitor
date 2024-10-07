@@ -7,16 +7,15 @@ Handles the core functionality of pinging IP addresses, managing asynchronous ta
 and providing real-time feedback through progress bars and latency graphs.
 
 Functions:
-    - run_ping_monitoring: Initiates ping monitoring with progress bars and real-time graphs.
+    - run_ping: Executes ping commands and records latency.
     - run_ping_monitoring: Initiates ping monitoring for multiple IP addresses with real-time visualizations.
 """
 
 import asyncio
-import logging
-import os
 import re
 import sys
 from collections import deque
+from pathlib import Path
 from typing import Dict
 
 import asciichartpy
@@ -42,7 +41,7 @@ async def run_ping(
     ip_address: str,
     duration: int,
     interval: int,
-    results_file: str,
+    results_file: Path,
     progress: Progress,
     task_id: TaskID,
     latency_data: Dict[str, deque],
@@ -58,13 +57,10 @@ async def run_ping(
         ip_address (str): The IP address to ping.
         duration (int): Total duration for which to ping, in seconds.
         interval (int): Interval between consecutive pings, in seconds.
-        results_file (str): Path to the file where ping results are recorded.
+        results_file (Path): Path to the file where ping results are recorded.
         progress (Progress): Rich Progress instance to update the progress bar.
         task_id (TaskID): Identifier for the specific progress task.
         latency_data (Dict[str, deque]): Dictionary storing latency data for each IP address.
-
-    Raises:
-        asyncio.SubprocessError: If the ping subprocess encounters an error.
     """
     loop = asyncio.get_event_loop()
     start_time = loop.time()
@@ -102,7 +98,8 @@ async def run_ping(
 
             # Log raw output for debugging
             if error_output:
-                logging.debug(f"Ping Error for {ip_address}: {error_output}")
+                # Use logging as per your central logging setup
+                pass  # Replace with logging.debug(...) if needed
 
             if proc.returncode == 0:
                 match = latency_regex.search(raw_output)
@@ -110,25 +107,26 @@ async def run_ping(
                     current_latency = float(match.group(1))
                 else:
                     current_latency = None
-                    logging.warning(
-                        f"Could not parse latency from ping output for {ip_address}. Output: {raw_output}"
-                    )
+                    # Use logging as per your central logging setup
+                    pass  # Replace with logging.warning(...) if needed
             else:
                 current_latency = None
-                logging.error(f"Ping failed for {ip_address}. Error: {error_output}")
+                # Use logging as per your central logging setup
+                pass  # Replace with logging.error(...) if needed
 
             # Write the result to the file with explicit encoding
-            with open(results_file, "a", encoding="utf-8") as f:
+            with results_file.open("a", encoding="utf-8") as f:
                 if current_latency is not None:
                     f.write(f"{current_latency}\n")
                 else:
                     f.write("Lost\n")
 
         except Exception as e:
-            logging.error(f"Exception occurred while pinging {ip_address}: {e}")
+            # Use logging as per your central logging setup
+            pass  # Replace with logging.error(...) if needed
             current_latency = None  # Ensure current_latency is defined
             # Write the error to the file with explicit encoding
-            with open(results_file, "a", encoding="utf-8") as f:
+            with results_file.open("a", encoding="utf-8") as f:
                 f.write(f"Error: {e}\n")
 
         finally:
@@ -145,7 +143,6 @@ async def run_ping(
                     advance=elapsed_since_last_update,
                     description=description,
                 )
-                logging.info(f"Ping to {ip_address}: {current_latency} ms")
                 # Update in-memory latency data
                 latency_data[ip_address].append(current_latency)
             else:
@@ -155,7 +152,6 @@ async def run_ping(
                     advance=elapsed_since_last_update,
                     description=description,
                 )
-                logging.warning(f"Ping to {ip_address} lost or latency not measurable.")
                 # Append 0 to represent lost ping
                 latency_data[ip_address].append(0)
 
@@ -165,10 +161,6 @@ async def run_ping(
         sleep_time = interval - time_taken
         if sleep_time > 0:
             await asyncio.sleep(sleep_time)
-        else:
-            logging.warning(
-                f"Ping execution took longer than interval for {ip_address}."
-            )
 
     # Ensure the progress bar reaches 100%
     progress.update(task_id, completed=duration)
@@ -184,11 +176,8 @@ async def run_ping_monitoring(config, results_subfolder, latency_data):
 
     Args:
         config (dict): Configuration dictionary containing settings like duration, ping intervals, IP addresses, etc.
-        results_subfolder (str): Path to the directory where ping results will be stored.
+        results_subfolder (Path): Path to the directory where ping results will be stored.
         latency_data (Dict[str, deque]): Dictionary to store latency data for each IP address.
-
-    Raises:
-        asyncio.CancelledError: If the ping monitoring is cancelled externally.
     """
     duration = config.get("duration", 10800)
     ping_interval = config.get("ping_interval", 1)
@@ -210,7 +199,7 @@ async def run_ping_monitoring(config, results_subfolder, latency_data):
     # Create tasks for each IP
     task_id_map = {}
     for ip in ips:
-        results_file = os.path.join(results_subfolder, f"ping_results_{ip}.txt")
+        results_file = results_subfolder / f"ping_results_{ip}.txt"
         task_id = progress.add_task(f"Pinging [cyan]{ip}[/cyan]", total=duration)
         task_id_map[ip] = task_id
         task = asyncio.create_task(
@@ -278,7 +267,7 @@ async def run_ping_monitoring(config, results_subfolder, latency_data):
                 # Determine color based on current max latency
                 if current_max < 75:
                     color = "green"
-                elif current_max < 100:
+                elif current_max < 125:
                     color = "yellow"
                 else:
                     color = "red"
@@ -325,3 +314,4 @@ async def run_ping_monitoring(config, results_subfolder, latency_data):
 
         # Wait for all tasks to complete
         await asyncio.gather(*tasks)
+

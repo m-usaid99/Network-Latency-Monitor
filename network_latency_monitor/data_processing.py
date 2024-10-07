@@ -47,7 +47,6 @@ def process_file_mode(config: Dict):
         console.print(
             f"[bold green]Processing ping result file:[/bold green] {file_path_obj}"
         )
-        logging.info(f"Processing ping result file: {file_path_obj}")
         process_ping_file(
             file_path=str(
                 file_path_obj
@@ -58,7 +57,6 @@ def process_file_mode(config: Dict):
             latency_threshold=config.get("latency_threshold", 200.0),
         )
         console.print("[bold green]Processing of ping file completed.[/bold green]")
-        logging.info("Processing of ping file completed.")
         sys.exit(0)  # Exit after processing file
 
 
@@ -101,7 +99,6 @@ def extract_ping_times(file_path: str) -> List[Optional[float]]:
                         logging.warning(
                             f"Unexpected line format in {file_path_obj}: {line}"
                         )
-        logging.info(f"Extracted {len(ping_times)} ping attempts from {file_path_obj}")
     except FileNotFoundError:
         logging.error(f"Ping result file {file_path_obj} not found.")
     except Exception as e:
@@ -157,15 +154,6 @@ def aggregate_ping_times(
         midpoint_time = start + (interval / 2)
         aggregated_data.append((midpoint_time, mean_latency, packet_loss))
 
-        if lost_pings == interval:
-            logging.warning(
-                f"All pings lost in interval {start}-{end} seconds. Mean Latency set to 0.0 ms at {midpoint_time}s."
-            )
-        else:
-            logging.debug(
-                f"Interval {start}-{end}s: Mean Latency = {mean_latency} ms, Packet Loss = {packet_loss}% at {midpoint_time}s"
-            )
-
     # Handle remaining pings
     remaining_pings = ping_times[total_intervals * interval :]
     if remaining_pings:
@@ -186,10 +174,6 @@ def aggregate_ping_times(
         if lost_pings == len(remaining_pings):
             logging.warning(
                 f"All pings lost in remaining interval {total_intervals * interval}-{total_intervals * interval + len(remaining_pings)} seconds. Mean Latency set to 0.0 ms at {midpoint_time}s."
-            )
-        else:
-            logging.debug(
-                f"Remaining Interval {total_intervals * interval}-{total_intervals * interval + len(remaining_pings)}s: Mean Latency = {mean_latency} ms, Packet Loss = {packet_loss}% at {midpoint_time}s"
             )
 
     return aggregated_data
@@ -247,9 +231,6 @@ def process_ping_results(
             console.print(
                 f"[bold yellow]Duration ({duration}s) is less than 60 seconds. Aggregation disabled for {ip_address}.[/bold yellow]"
             )
-            logging.info(
-                f"Duration ({duration}s) is less than 60 seconds. Aggregation disabled for {ip_address}."
-            )
             aggregate = False
         else:
             aggregate = not config.get("no_aggregation", False)
@@ -265,10 +246,6 @@ def process_ping_results(
             agg_df["Packet Loss (%)"] = agg_df["Packet Loss (%)"].fillna(
                 100.0
             )  # If packet loss is NaN, assume 100%
-            logging.debug(f"Aggregated data for {ip_address}:\n{agg_df}")
-            logging.info(
-                f"Aggregated {len(aggregated_data)} intervals for {ip_address}."
-            )
         else:
             agg_df = None
 
@@ -317,9 +294,6 @@ def process_ping_file(
 
     # Determine if aggregation should be enforced based on duration
     if duration < 60:
-        logging.info(
-            f"Duration ({duration}s) is less than 60 seconds. Aggregation disabled for {ip_address}."
-        )
         aggregate = False
     else:
         aggregate = not no_aggregation
@@ -363,7 +337,6 @@ def process_ping_file(
     plot_subfolder = plots_folder / f"plots_{current_date}"
     try:
         plot_subfolder.mkdir(parents=True, exist_ok=True)
-        logging.info(f"Created plot subdirectory: {plot_subfolder}")
     except Exception as e:
         logging.error(f"Failed to create plot subdirectory {plot_subfolder}: {e}")
         console.print(
@@ -373,4 +346,3 @@ def process_ping_file(
 
     # Generate and save the plot
     generate_plots(config, data_dict, latency_threshold)
-

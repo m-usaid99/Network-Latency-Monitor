@@ -134,33 +134,36 @@ def generate_plots(
         generate_plots(config, data_dict, latency_threshold=200.0, no_segmentation=False)
         ```
     """
-    # Retrieve the base plots folder from the configuration
-    plots_folder = Path(config.get("plots_folder", "plots"))
+    # Retrieve the base plots directory from the configuration
+    plots_dir = Path(
+        config.get("plots_dir")
+    )  # Changed from "plots_folder" to "plots_dir"
 
     # Generate a timestamp for the subdirectory name
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
-    # Create a timestamped subdirectory within the plots folder
-    plots_subfolder = plots_folder / f"plots_{timestamp}"
+    # Create a timestamped subdirectory within the plots directory
+    plots_subdir = plots_dir / f"plots_{timestamp}"
     try:
-        plots_subfolder.mkdir(parents=True, exist_ok=True)
-        logging.info(f"Created plots subdirectory: {plots_subfolder}")
+        plots_subdir.mkdir(parents=True, exist_ok=True)
     except OSError as e:
-        logging.error(f"Failed to create plots subdirectory {plots_subfolder}: {e}")
         console.print(
-            f"[bold red]Failed to create plots subdirectory {plots_subfolder}: {e}[/bold red]"
+            f"[bold red]Failed to create plots subdirectory {plots_subdir}: {e}[/bold red]"
         )
-        raise
+        logging.error(f"Failed to create plots subdirectory {plots_subdir}: {e}")
+        return  # Exit the function if the directory cannot be created
 
     # Determine the maximum duration based on the data
     try:
         max_duration = max(
-            data["raw"]["Time (s)"].max()
+            raw_df["Time (s)"].max()
             for data in data_dict.values()
-            if "Time (s)" in data["raw"] and not data["raw"]["Time (s)"].isnull().all()
+            for raw_df in [data.get("raw")]
+            if raw_df is not None
+            and "Time (s)" in raw_df.columns
+            and not raw_df["Time (s)"].isnull().all()
         )
         max_duration = int(max_duration)
-        logging.info(f"Maximum monitoring duration: {max_duration} seconds")
     except ValueError:
         console.print(
             "[bold red]No valid 'Time (s)' data found in 'raw' datasets.[/bold red]"
@@ -190,7 +193,7 @@ def generate_plots(
         segment_starts, segment_ends, segment_labels
     ):
         plt.figure(figsize=(14, 8))
-        # Define a darker color palette
+        # Define a color palette
         palette = sns.color_palette("deep", n_colors=len(data_dict))
         high_latency_times = []
 
@@ -198,6 +201,11 @@ def generate_plots(
             raw_df = data.get("raw")
             agg_df = data.get("aggregated")
             color = palette[idx % len(palette)]
+
+            if raw_df is None:
+                console.print(f"[yellow]No raw data available for IP: {ip}.[/yellow]")
+                continue
+
             plot_raw_df = raw_df.copy()
 
             # Ensure 'Ping (ms)' column exists
@@ -249,14 +257,17 @@ def generate_plots(
             if not high_latency_raw.empty:
                 high_latency_times.extend(high_latency_raw["Time (s)"].tolist())
 
-            if agg_df is not None and "Mean Latency (ms)" in agg_df.columns:
-                # Ensure 'Time (s)' exists in aggregated data
-                if "Time (s)" not in agg_df.columns:
+            if agg_df is not None:
+                # Ensure 'Mean Latency (ms)' and 'Time (s)' columns exist
+                if (
+                    "Mean Latency (ms)" not in agg_df.columns
+                    or "Time (s)" not in agg_df.columns
+                ):
                     console.print(
-                        f"[bold red]Missing 'Time (s)' column in aggregated data for IP: {ip}.[/bold red]"
+                        f"[bold red]Missing 'Mean Latency (ms)' or 'Time (s)' column in aggregated data for IP: {ip}.[/bold red]"
                     )
                     logging.error(
-                        f"Missing 'Time (s)' column in aggregated data for IP: {ip}."
+                        f"Missing 'Mean Latency (ms)' or 'Time (s)' column in aggregated data for IP: {ip}."
                     )
                     continue
 
@@ -294,7 +305,7 @@ def generate_plots(
             end = sorted_times[0]
 
             for time in sorted_times[1:]:
-                if time == end + 1:
+                if time <= end + 1:
                     end = time
                 else:
                     shading_regions.append((start, end))
@@ -340,19 +351,18 @@ def generate_plots(
         )  # Customized grid
         plt.tight_layout()
 
-        # Define the plot filename with date and time
+        # Define the plot filename with date, time, and segment label
         plot_filename = f"ping_plot_{timestamp}_{segment_label}.png"
-        plot_path = plots_subfolder / plot_filename
+        plot_path = plots_subdir / plot_filename
 
         # Save the plot
         try:
             plt.savefig(plot_path)
             plt.close()
-            logging.info(f"Generated plot: {plot_path}")
             console.print(f"[bold green]Generated plot:[/bold green] {plot_path}")
         except Exception as e:
-            logging.error(f"Failed to save plot {plot_path}: {e}")
             console.print(f"[bold red]Failed to save plot {plot_path}: {e}[/bold red]")
+            logging.error(f"Failed to save plot {plot_path}: {e}")
 
 
 def display_plots_and_summary(
@@ -390,7 +400,6 @@ def display_plots_and_summary(
                 no_segmentation=no_segmentation,
             )
             console.print("[bold green]Plot generation completed.[/bold green]")
-            logging.info("Plot generation completed.")
         except Exception as e:
             console.print(
                 f"[bold red]An error occurred during plot generation: {e}[/bold red]"
@@ -405,7 +414,6 @@ def display_plots_and_summary(
         console.print("[bold blue]Displaying Summary Statistics...[/bold blue]")
         try:
             display_summary(data_dict)
-            logging.info("Summary statistics displayed.")
         except Exception as e:
             console.print(
                 f"[bold red]An error occurred while displaying summary statistics: {e}[/bold red]"

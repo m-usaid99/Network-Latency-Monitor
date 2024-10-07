@@ -14,13 +14,10 @@ Functions:
 
 import asyncio
 import logging
-import os
 import sys
 from collections import deque
 
-from rich.console import Console
-
-from network_latency_monitor import (
+from network_latency_monitor import (  # Updated import assuming config.py is in the same directory or appropriately referenced
     create_results_directory,
     display_plots_and_summary,
     handle_clear_operations,
@@ -31,10 +28,11 @@ from network_latency_monitor import (
     process_ping_results,
     regenerate_default_config,
     run_ping_monitoring,
-    setup_logging,
+    setup_logging,  # Ensure this is correctly implemented in your config or another module
     validate_and_get_ips,
     validate_config,
 )
+from rich.console import Console
 
 # Initialize Rich Console
 console = Console()
@@ -85,26 +83,22 @@ async def main():
     # Load configuration
     config = load_config()
 
-    if not os.path.exists("config.yaml") or os.path.getsize("config.yaml") == 0:
-        console.print(
-            "[bold yellow]A default 'config.yaml' has been created. Please review and modify it as needed before running the tool again.[/bold yellow]"
-        )
-        sys.exit(0)
-
+    # Merge CLI arguments into config
     config = merge_args_into_config(args, config)
-    validate_config(config)
-    # Setup logging (logs are written to files only)
-    setup_logging(config.get("log_folder", "logs"))
 
-    logging.info("Configuration and arguments loaded.")
-    logging.info(f"Configuration: {config}")
-    logging.info(f"Arguments: {args}")
+    # Validate configuration
+    validate_config(config)
+
+    # Setup logging (logs are written to files only)
+    setup_logging(config.get("log_dir"))
 
     # Handle clear operations if any
     handle_clear_operations(config)
 
     # If file mode is enabled, process the file directly
-    process_file_mode(config)
+    if config.get("file"):
+        process_file_mode(config)
+        sys.exit(0)  # Exit after processing the file
 
     # Validate IP addresses
     config["ip_addresses"] = validate_and_get_ips(config)
@@ -123,7 +117,6 @@ async def main():
     console.print("[bold blue]Starting ping monitoring...[/bold blue]")
     await run_ping_monitoring(config, results_subfolder, latency_data)
     console.print("[bold green]Ping monitoring completed.[/bold green]")
-    logging.info("All ping tasks completed.")
 
     # Process ping results
     data_dict = process_ping_results(results_subfolder, config)

@@ -96,12 +96,9 @@ def setup_logging(
         logger.addHandler(console_handler)
 
         # Log the initialization
-        logger.info(f"Logging initialized. Logs are being written to: {log_file}")
-        logger.debug("File and console handlers added to the logger.")
-
+        logging.getLogger("matplotlib").setLevel(logging.ERROR)
         _logger_initialized = True  # Mark logger as initialized
 
     except OSError as e:
         print(f"Failed to create log directory '{log_folder}': {e}", file=sys.stderr)
         raise
-
