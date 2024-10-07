@@ -1,7 +1,7 @@
 Introduction
 ============
 
-Welcome to the **Network Latency Manager (NLM)** documentation.
+Welcome to the **Network Latency Monitor (NLM)** documentation.
 
 NLM is a tool designed to monitor network latency across specified IP addresses, providing real-time feedback through progress bars and latency graphs.
 

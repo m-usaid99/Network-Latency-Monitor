@@ -10,7 +10,7 @@ import logging
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = "NLM: Network Latency Manager"
+project = "NLM: Network Latency Monitor"
 copyright = "2024, M. Usaid Rehman"
 author = "M. Usaid Rehman"
 release = "0.1.0"
@@ -67,4 +67,3 @@ intersphinx_mapping = {
 # -- Suppress Matplotlib debug logs -------------------------------------------
 
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
-
