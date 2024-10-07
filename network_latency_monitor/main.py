@@ -13,7 +13,6 @@ Functions:
 """
 
 import asyncio
-import logging
 import sys
 from collections import deque
 
@@ -42,8 +41,6 @@ console = Console()
 #       - generate docs thru sphinx
 #       - redo Readme
 #       - turn it into publishable package (half-done)
-#       - check plot path in config
-#       - figure out filepath where shit is saved
 
 
 async def main():
