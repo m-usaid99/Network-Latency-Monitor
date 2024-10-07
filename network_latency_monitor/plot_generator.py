@@ -414,4 +414,3 @@ def display_plots_and_summary(
     else:
         console.print("[bold red]No data available for summary statistics.[/bold red]")
         logging.warning("No data available for summary statistics.")
-
