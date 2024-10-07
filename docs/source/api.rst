@@ -8,5 +8,9 @@ This section provides the technical details of NLM's codebase.
 
    api/main
    api/config
+   api/cli
    api/ping_manager
+   api/data_processing
+   api/plot_generator
+   api/logger
    api/utils
