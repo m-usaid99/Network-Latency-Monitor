@@ -3,6 +3,9 @@ name = "network-latency-monitor"
 version = "0.1.0"
 description = "Monitor your network latency using real-time plots and cumulative plots"
 authors = ["Muhammad Usaid Rehman <rehman.usaid@gmail.com>"]
+homepage = "https://github.com/m-usaid99/Network-Latency-Monitor"
+repository = "https://github.com/m-usaid99/Network-Latency-Monitor"
+documentation = "https://network-latency-monitor.readthedocs.io/en/latest/"
 readme = "README.md"
 license = "MIT"
 
