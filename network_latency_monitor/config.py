@@ -78,7 +78,7 @@ def load_config(config_file: str = "config.yaml") -> Dict:
     Returns:
         Dict: Configuration dictionary.
     """
-    app_name = "NLM"  # Replace with your actual application name
+    app_name = "network_latency_monitor"  # Replace with your actual application name
     dirs = get_standard_directories(app_name)
     config_dir = dirs["config_dir"]
     data_dir = dirs["data_dir"]
@@ -153,7 +153,7 @@ def regenerate_default_config(config_file: str = "config.yaml"):
     Args:
         config_file (str, optional): Path to the config file. Defaults to "config.yaml".
     """
-    app_name = "NLM"  # Replace with your actual application name
+    app_name = "network_latency_monitor"  # Replace with your actual application name
     dirs = get_standard_directories(app_name)
     config_dir = dirs["config_dir"]
     config_path = config_dir / config_file
