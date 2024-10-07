@@ -10,12 +10,13 @@ Functions:
     - merge_args_into_config: Merges CLI arguments into the configuration.
     - validate_config: Validates the configuration values.
     - regenerate_default_config: Regenerates the default configuration file.
+    - get_standard_directories: Retrieves standard directories based on the operating system.
 """
 
 import yaml
 from pathlib import Path
 import sys
-from typing import Dict
+from typing import Dict, Tuple
 from rich.console import Console
 from rich.prompt import Prompt
 from appdirs import AppDirs
@@ -24,7 +25,16 @@ from appdirs import AppDirs
 console = Console()
 
 
-def get_standard_directories(app_name: str):
+def get_standard_directories(app_name: str) -> Tuple[Path, Path, Path, Path, Path]:
+    """
+    Retrieve standard directories based on the operating system.
+
+    Args:
+        app_name (str): The name of the application.
+
+    Returns:
+        Tuple[Path, Path, Path, Path, Path]: Paths for config_dir, data_dir, log_dir, plots_dir, and results_dir.
+    """
     dirs = AppDirs(app_name)
     config_dir = Path(dirs.user_config_dir)
     data_dir = Path(dirs.user_data_dir)
@@ -36,11 +46,13 @@ def get_standard_directories(app_name: str):
 
 def load_config(config_file: str = "config.yaml") -> Dict:
     """
-    Loads the configuration from config.yaml. If the file does not exist,
-    it creates one with default settings.
+    Load configuration from a YAML file. Create one with default settings if it does not exist.
 
-    :param config_file: Path to the config file.
-    :return: Configuration dictionary.
+    Args:
+        config_file (str, optional): Path to the config file. Defaults to "config.yaml".
+
+    Returns:
+        Dict: Configuration dictionary.
     """
     app_name = "NLM"  # Replace with your actual application name
     config_dir, data_dir, log_dir, plots_dir, results_dir = get_standard_directories(
@@ -126,11 +138,17 @@ def load_config(config_file: str = "config.yaml") -> Dict:
 
 def regenerate_default_config(config_file: str = "config.yaml"):
     """
-    Regenerates the config.yaml file with default settings after user confirmation.
+    Regenerate the config.yaml file with default settings after user confirmation.
 
-    :param config_file: Path to the config file.
+    Args:
+        config_file (str, optional): Path to the config file. Defaults to "config.yaml".
     """
-    config_path = Path(config_file)
+    app_name = "NLM"  # Replace with your actual application name
+    config_dir, data_dir, log_dir, plots_dir, results_dir = get_standard_directories(
+        app_name
+    )
+    config_path = config_dir / config_file
+
     if config_path.exists():
         # Prompt for confirmation
         confirmation = Prompt.ask(
@@ -151,12 +169,12 @@ def regenerate_default_config(config_file: str = "config.yaml"):
         "latency_threshold": 200.0,  # in ms
         "no_aggregation": False,
         "no_segmentation": False,
-        "results_folder": "results",
-        "plots_folder": "plots",
-        "log_folder": "logs",
+        "config_dir": str(config_dir),
+        "data_dir": str(data_dir),
         "file": None,  # Optional: Specify a ping result file to process
         "clear": False,  # Set to True to clear all data
         "clear_results": False,  # Set to True to clear results folder
+        "clear_plots": False,  # Set to True to clear plots folder
         "clear_logs": False,  # Set to True to clear logs folder
         "yes": False,  # Set to True to auto-confirm prompts
     }
@@ -169,17 +187,21 @@ def regenerate_default_config(config_file: str = "config.yaml"):
         )
 
         # Create necessary directories based on default_config
-        for folder_key in ["results_folder", "plots_folder", "log_folder"]:
-            folder_path = Path(default_config[folder_key])
-            if not folder_path.exists():
+        for folder_key, path in [
+            ("data_dir", data_dir),
+            ("log_dir", log_dir),
+            ("plots_dir", plots_dir),
+            ("results_dir", results_dir),
+        ]:
+            if not path.exists():
                 try:
-                    folder_path.mkdir(parents=True, exist_ok=True)
+                    path.mkdir(parents=True, exist_ok=True)
                     console.print(
-                        f"[bold green]Created directory '{folder_path}' for '{folder_key}'.[/bold green]"
+                        f"[bold green]Created directory '{path}' for '{folder_key}'.[/bold green]"
                     )
                 except Exception as e:
                     console.print(
-                        f"[bold red]Failed to create directory '{folder_path}' for '{folder_key}': {e}[/bold red]"
+                        f"[bold red]Failed to create directory '{path}' for '{folder_key}': {e}[/bold red]"
                     )
                     sys.exit(1)
 
@@ -192,8 +214,14 @@ def regenerate_default_config(config_file: str = "config.yaml"):
 
 def merge_args_into_config(args, config: Dict) -> Dict:
     """
-    Merges command-line arguments into the configuration dictionary,
-    giving precedence to CLI arguments over config file settings.
+    Merge command-line arguments into the configuration dictionary, giving precedence to CLI arguments.
+
+    Args:
+        args: Parsed command-line arguments.
+        config (Dict): Configuration dictionary.
+
+    Returns:
+        Dict: Updated configuration dictionary with CLI arguments merged in.
     """
     # Map CLI argument names to config keys
     arg_to_config_map = {
@@ -224,7 +252,13 @@ def merge_args_into_config(args, config: Dict) -> Dict:
 
 def validate_config(config: Dict) -> None:
     """
-    Validates configuration values.
+    Validate configuration values and ensure necessary directories exist.
+
+    Args:
+        config (Dict): Configuration dictionary.
+
+    Exits:
+        SystemExit: If any validation fails or directory creation encounters an error.
     """
     # Validate duration
     if not isinstance(config.get("duration"), int) or config["duration"] <= 0:
@@ -246,8 +280,8 @@ def validate_config(config: Dict) -> None:
         )
         sys.exit(1)
 
-    # Validate results_folder, plots_folder, and log_folder paths
-    for folder_key in ["results_folder", "plots_folder", "log_folder"]:
+    # Validate results_dir, plots_dir, and log_dir paths
+    for folder_key in ["results_dir", "plots_dir", "log_dir"]:
         folder_path = Path(config.get(folder_key, ""))
         if not folder_path.is_dir() and config.get(folder_key, ""):
             try:
@@ -262,3 +296,4 @@ def validate_config(config: Dict) -> None:
                 sys.exit(1)
 
     # Add more validations as needed
+
