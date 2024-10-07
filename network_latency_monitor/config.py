@@ -18,9 +18,20 @@ import sys
 from typing import Dict
 from rich.console import Console
 from rich.prompt import Prompt
+from appdirs import AppDirs
 
 # Initialize Rich Console
 console = Console()
+
+
+def get_standard_directories(app_name: str):
+    dirs = AppDirs(app_name)
+    config_dir = Path(dirs.user_config_dir)
+    data_dir = Path(dirs.user_data_dir)
+    log_dir = Path(dirs.user_log_dir)
+    plots_dir = data_dir / "plots"
+    results_dir = data_dir / "results"
+    return config_dir, data_dir, log_dir, plots_dir, results_dir
 
 
 def load_config(config_file: str = "config.yaml") -> Dict:
@@ -31,6 +42,11 @@ def load_config(config_file: str = "config.yaml") -> Dict:
     :param config_file: Path to the config file.
     :return: Configuration dictionary.
     """
+    app_name = "NLM"  # Replace with your actual application name
+    config_dir, data_dir, log_dir, plots_dir, results_dir = get_standard_directories(
+        app_name
+    )
+
     default_config = {
         "duration": 10800,  # in seconds
         "ip_addresses": ["8.8.8.8"],
@@ -38,26 +54,38 @@ def load_config(config_file: str = "config.yaml") -> Dict:
         "latency_threshold": 200.0,  # in ms
         "no_aggregation": False,
         "no_segmentation": False,
-        "results_folder": "results",
-        "plots_folder": "plots",
-        "log_folder": "logs",
+        "config_dir": str(config_dir),
+        "data_dir": str(data_dir),
         "file": None,  # Optional: Specify a ping result file to process
         "clear": False,  # Set to True to clear all data
         "clear_results": False,  # Set to True to clear results folder
+        "clear_plots": False,  # Set to True to clear plots folder
         "clear_logs": False,  # Set to True to clear logs folder
         "yes": False,  # Set to True to auto-confirm prompts
     }
 
-    config_path = Path(config_file)
+    if config_dir.exists():
+        config_path = config_dir / config_file
+    else:
+        config_path = config_dir / config_file
+        config_dir.mkdir(parents=True, exist_ok=True)
+        console.print(
+            f"[bold green]Created configuration directory at '{config_dir}'.[/bold green]"
+        )
 
     if config_path.exists():
         try:
             with config_path.open("r", encoding="utf-8") as f:
                 user_config = yaml.safe_load(f) or {}
-                # Merge user_config into default_config
-                config = {**default_config, **user_config}
+            # Merge user_config into default_config
+            config = {**default_config, **user_config}
         except yaml.YAMLError as e:
             console.print(f"[bold red]Error parsing the config file: {e}[/bold red]")
+            config = default_config
+        except Exception as e:
+            console.print(
+                f"[bold red]Unexpected error loading config file '{config_path}': {e}[/bold red]"
+            )
             config = default_config
     else:
         # Create config.yaml with default settings
@@ -73,6 +101,25 @@ def load_config(config_file: str = "config.yaml") -> Dict:
             )
             sys.exit(1)
         config = default_config
+
+    # Ensure data directories exist
+    for key, path in [
+        ("data_dir", data_dir),
+        ("log_dir", log_dir),
+        ("plots_dir", plots_dir),
+        ("results_dir", results_dir),
+    ]:
+        if not path.exists():
+            try:
+                path.mkdir(parents=True, exist_ok=True)
+                console.print(
+                    f"[bold green]Created directory '{path}' for '{key}'.[/bold green]"
+                )
+            except Exception as e:
+                console.print(
+                    f"[bold red]Failed to create directory '{path}' for '{key}': {e}[/bold red]"
+                )
+                sys.exit(1)
 
     return config
 
@@ -120,6 +167,22 @@ def regenerate_default_config(config_file: str = "config.yaml"):
         console.print(
             f"[bold green]Default configuration file regenerated at '{config_path}'. Please review and modify it as needed.[/bold green]"
         )
+
+        # Create necessary directories based on default_config
+        for folder_key in ["results_folder", "plots_folder", "log_folder"]:
+            folder_path = Path(default_config[folder_key])
+            if not folder_path.exists():
+                try:
+                    folder_path.mkdir(parents=True, exist_ok=True)
+                    console.print(
+                        f"[bold green]Created directory '{folder_path}' for '{folder_key}'.[/bold green]"
+                    )
+                except Exception as e:
+                    console.print(
+                        f"[bold red]Failed to create directory '{folder_path}' for '{folder_key}': {e}[/bold red]"
+                    )
+                    sys.exit(1)
+
     except Exception as e:
         console.print(
             f"[bold red]Failed to regenerate config file '{config_path}': {e}[/bold red]"

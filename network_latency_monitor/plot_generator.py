@@ -27,27 +27,29 @@ from rich.console import Console
 console = Console()
 
 
-def display_summary(data_dict: dict) -> None:
+def display_summary(data_dict: Dict[str, Dict[str, pd.DataFrame]]) -> None:
     """
     Displays summary statistics for each IP address in a formatted table.
 
-    This function creates a Rich table that summarizes key metrics such as total pings,
+    Creates a Rich table that summarizes key metrics such as total pings,
     successful pings, packet loss percentage, and latency statistics (average, min, max)
     for each monitored IP address.
 
     Args:
-        data_dict (Dict[str, Dict[str, pd.DataFrame]]): A nested dictionary where each key is
-            an IP address, and its value is another dictionary containing 'raw' and 'aggregated'
-            pandas DataFrames with ping data.
+        data_dict (Dict[str, Dict[str, pd.DataFrame]]):
+            A nested dictionary where each key is an IP address, and its value is another dictionary
+            containing 'raw' and 'aggregated' pandas DataFrames with ping data.
 
     Example:
-        >>> data = {
-        ...     '8.8.8.8': {
-        ...         'raw': pd.DataFrame({'Ping (ms)': [23.5, 24.1, None, 25.0]}),
-        ...         'aggregated': pd.DataFrame({'Mean Latency (ms)': [24.2], 'Packet Loss (%)': [25.0]})
-        ...     }
-        ... }
-        >>> display_summary(data)
+        ```python
+        data = {
+            '8.8.8.8': {
+                'raw': pd.DataFrame({'Ping (ms)': [23.5, 24.1, None, 25.0]}),
+                'aggregated': pd.DataFrame({'Mean Latency (ms)': [24.2], 'Packet Loss (%)': [25.0]})
+            }
+        }
+        display_summary(data)
+        ```
     """
     table = Table(title="Ping Summary Statistics")
 
@@ -105,23 +107,32 @@ def generate_plots(
     """
     Generates latency plots based on the provided configuration and data.
 
-    This function creates latency plots for each IP address, optionally segmented into
-    hourly intervals. It highlights high latency regions based on the specified threshold
+    Creates latency plots for each IP address, optionally segmented into
+    hourly intervals. Highlights high latency regions based on the specified threshold
     and saves the generated plots in a timestamped subdirectory within the plots folder.
 
     Args:
-        config (Dict[str, str]): Configuration dictionary containing settings like
-            plots folder path and segmentation preferences.
-        data_dict (Dict[str, Dict[str, Optional[pd.DataFrame]]]): A nested dictionary where each key
-            is an IP address, and its value is another dictionary containing 'raw' and 'aggregated'
-            pandas DataFrames with ping data.
-        latency_threshold (float): Latency threshold in milliseconds for highlighting high latency regions.
-        no_segmentation (bool, optional): If True, generates a single plot for the entire duration
-            without segmentation. Defaults to False.
+        config (Dict[str, str]):
+            Configuration dictionary containing settings like plots folder path and segmentation preferences.
+        data_dict (Dict[str, Dict[str, Optional[pd.DataFrame]]]):
+            A nested dictionary where each key is an IP address, and its value is another dictionary
+            containing 'raw' and 'aggregated' pandas DataFrames with ping data.
+        latency_threshold (float):
+            Latency threshold in milliseconds for highlighting high latency regions.
+        no_segmentation (bool, optional):
+            If True, generates a single plot for the entire duration without segmentation.
+            Defaults to False.
 
     Raises:
-        OSError: If the plots subdirectory cannot be created.
-        Exception: For any other errors that occur during plot generation.
+        OSError:
+            If the plots subdirectory cannot be created.
+        Exception:
+            For any other errors that occur during plot generation.
+
+    Example:
+        ```python
+        generate_plots(config, data_dict, latency_threshold=200.0, no_segmentation=False)
+        ```
     """
     # Retrieve the base plots folder from the configuration
     plots_folder = Path(config.get("plots_folder", "plots"))
@@ -142,13 +153,24 @@ def generate_plots(
         raise
 
     # Determine the maximum duration based on the data
-    max_duration = max(
-        data["raw"]["Time (s)"].max()
-        for data in data_dict.values()
-        if "Time (s)" in data["raw"]
-    )
-    max_duration = int(max_duration)
-    logging.info(f"Maximum monitoring duration: {max_duration} seconds")
+    try:
+        max_duration = max(
+            data["raw"]["Time (s)"].max()
+            for data in data_dict.values()
+            if "Time (s)" in data["raw"] and not data["raw"]["Time (s)"].isnull().all()
+        )
+        max_duration = int(max_duration)
+        logging.info(f"Maximum monitoring duration: {max_duration} seconds")
+    except ValueError:
+        console.print(
+            "[bold red]No valid 'Time (s)' data found in 'raw' datasets.[/bold red]"
+        )
+        logging.error("No valid 'Time (s)' data found in 'raw' datasets.")
+        return
+    except Exception as e:
+        console.print(f"[bold red]Error determining maximum duration: {e}[/bold red]")
+        logging.error(f"Error determining maximum duration: {e}")
+        return
 
     # If no segmentation is requested, generate a single plot
     if no_segmentation:
@@ -173,18 +195,42 @@ def generate_plots(
         high_latency_times = []
 
         for idx, (ip, data) in enumerate(data_dict.items()):
-            raw_df = data["raw"]
-            agg_df = data["aggregated"]
+            raw_df = data.get("raw")
+            agg_df = data.get("aggregated")
             color = palette[idx % len(palette)]
             plot_raw_df = raw_df.copy()
+
+            # Ensure 'Ping (ms)' column exists
+            if "Ping (ms)" not in plot_raw_df.columns:
+                console.print(
+                    f"[bold red]Missing 'Ping (ms)' column for IP: {ip}.[/bold red]"
+                )
+                logging.error(f"Missing 'Ping (ms)' column for IP: {ip}.")
+                continue
+
+            # Fill NaN values and clip to avoid extreme values
             plot_raw_df["Ping (ms)"] = plot_raw_df["Ping (ms)"].fillna(800.0)
             plot_raw_df["Ping (ms)"] = plot_raw_df["Ping (ms)"].clip(upper=800.0)
+
+            # Ensure 'Time (s)' column exists
+            if "Time (s)" not in plot_raw_df.columns:
+                console.print(
+                    f"[bold red]Missing 'Time (s)' column for IP: {ip}.[/bold red]"
+                )
+                logging.error(f"Missing 'Time (s)' column for IP: {ip}.")
+                continue
 
             # Filter data for the current segment
             segment_data = plot_raw_df[
                 (plot_raw_df["Time (s)"] >= segment_start)
                 & (plot_raw_df["Time (s)"] < segment_end)
             ]
+
+            if segment_data.empty:
+                console.print(
+                    f"[yellow]No data available for IP: {ip} in segment '{segment_label}'.[/yellow]"
+                )
+                continue
 
             # Plot Raw Ping with increased opacity
             sns.lineplot(
@@ -203,12 +249,28 @@ def generate_plots(
             if not high_latency_raw.empty:
                 high_latency_times.extend(high_latency_raw["Time (s)"].tolist())
 
-            if agg_df is not None:
+            if agg_df is not None and "Mean Latency (ms)" in agg_df.columns:
+                # Ensure 'Time (s)' exists in aggregated data
+                if "Time (s)" not in agg_df.columns:
+                    console.print(
+                        f"[bold red]Missing 'Time (s)' column in aggregated data for IP: {ip}.[/bold red]"
+                    )
+                    logging.error(
+                        f"Missing 'Time (s)' column in aggregated data for IP: {ip}."
+                    )
+                    continue
+
                 # Filter aggregated data for the current segment
                 agg_segment = agg_df[
                     (agg_df["Time (s)"] >= segment_start)
                     & (agg_df["Time (s)"] < segment_end)
                 ]
+
+                if agg_segment.empty:
+                    console.print(
+                        f"[yellow]No aggregated data available for IP: {ip} in segment '{segment_label}'.[/yellow]"
+                    )
+                    continue
 
                 # Plot Mean Latency
                 sns.lineplot(
@@ -283,29 +345,36 @@ def generate_plots(
         plot_path = plots_subfolder / plot_filename
 
         # Save the plot
-        plt.savefig(plot_path)
-        plt.close()
-        logging.info(f"Generated plot: {plot_path}")
+        try:
+            plt.savefig(plot_path)
+            plt.close()
+            logging.info(f"Generated plot: {plot_path}")
+            console.print(f"[bold green]Generated plot:[/bold green] {plot_path}")
+        except Exception as e:
+            logging.error(f"Failed to save plot {plot_path}: {e}")
+            console.print(f"[bold red]Failed to save plot {plot_path}: {e}[/bold red]")
 
-        # Notify the user
-        console.print(f"[bold green]Generated plot:[/bold green] {plot_path}")
 
-
-def display_plots_and_summary(data_dict, config):
+def display_plots_and_summary(
+    data_dict: Dict[str, Dict[str, Optional[pd.DataFrame]]], config: Dict[str, str]
+) -> None:
     """
     Coordinates plot generation and summary statistics display.
 
-    This function checks if data is available and then calls `generate_plots` to create
-    visualizations and `display_summary` to present statistics in a table. It handles
-    scenarios where data may be missing.
+    Checks if data is available and then calls `generate_plots` to create
+    visualizations and `display_summary` to present statistics in a table.
+    Handles scenarios where data may be missing.
 
     Args:
-        data_dict (Dict[str, Dict[str, Optional[pd.DataFrame]]]): Nested dictionary containing ping data.
-        config (Dict): Configuration dictionary containing settings.
+        data_dict (Dict[str, Dict[str, Optional[pd.DataFrame]]]):
+            Nested dictionary containing ping data.
+        config (Dict[str, str]):
+            Configuration dictionary containing settings.
 
     Example:
-        >>> display_plots_and_summary(data_dict, config)
-        # Generates plots and displays summary statistics.
+        ```python
+        display_plots_and_summary(data_dict, config)
+        ```
     """
     latency_threshold = config.get("latency_threshold", 200.0)
     no_segmentation = config.get("no_segmentation", False)
@@ -313,14 +382,20 @@ def display_plots_and_summary(data_dict, config):
     # Generate plots if data is available
     if data_dict:
         console.print("[bold blue]Generating plots...[/bold blue]")
-        generate_plots(
-            config=config,
-            data_dict=data_dict,
-            latency_threshold=latency_threshold,
-            no_segmentation=no_segmentation,
-        )
-        console.print("[bold green]Plot generation completed.[/bold green]")
-        logging.info("Plot generation completed.")
+        try:
+            generate_plots(
+                config=config,
+                data_dict=data_dict,
+                latency_threshold=latency_threshold,
+                no_segmentation=no_segmentation,
+            )
+            console.print("[bold green]Plot generation completed.[/bold green]")
+            logging.info("Plot generation completed.")
+        except Exception as e:
+            console.print(
+                f"[bold red]An error occurred during plot generation: {e}[/bold red]"
+            )
+            logging.error(f"An error occurred during plot generation: {e}")
     else:
         console.print("[bold red]No data available for plotting.[/bold red]")
         logging.warning("No data available for plotting.")
@@ -328,8 +403,14 @@ def display_plots_and_summary(data_dict, config):
     # Display summary statistics
     if data_dict:
         console.print("[bold blue]Displaying Summary Statistics...[/bold blue]")
-        display_summary(data_dict)
-        logging.info("Summary statistics displayed.")
+        try:
+            display_summary(data_dict)
+            logging.info("Summary statistics displayed.")
+        except Exception as e:
+            console.print(
+                f"[bold red]An error occurred while displaying summary statistics: {e}[/bold red]"
+            )
+            logging.error(f"An error occurred while displaying summary statistics: {e}")
     else:
         console.print("[bold red]No data available for summary statistics.[/bold red]")
         logging.warning("No data available for summary statistics.")
