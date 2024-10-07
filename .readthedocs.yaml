@@ -8,12 +8,11 @@ build:
   tools:
     python: "3.10"
 
-# Python dependency management
+# Install dependencies via pip
 python:
   install:
-    - method: pip
-      requirements: requirements.txt  # Generated from Poetry
-    - requirements: docs/requirements.txt  # Additional documentation-related dependencies
+    - requirements: requirements.txt  # Use the requirements.txt file for dependencies
+    - requirements: docs/requirements.txt  # For Sphinx and other doc-related dependencies
 
 # Sphinx configuration
 sphinx:
