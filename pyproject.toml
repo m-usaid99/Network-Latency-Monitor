@@ -30,6 +30,10 @@ pyyaml = "^6.0.2"
 appdirs = "^1.4.4"
 
 
+[tool.poetry.group.dev.dependencies]
+safety = "^3.2.8"
+pytest = "^8.3.3"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
