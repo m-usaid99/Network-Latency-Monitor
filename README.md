@@ -1,5 +1,23 @@
 # NLM: Network Latency Monitor
 
+<!--toc:start-->
+
+- [Installation](#installation)
+  - [Installation via pip](#installation-via-pip)
+  - [Install from Source](#install-from-source)
+- [Usage](#usage)
+  - [Configuration](#configuration)
+- [Running the Program](#running-the-program)
+  - [Usage Examples](#usage-examples)
+- [Contributing](#contributing)
+  - [How to Contribute](#how-to-contribute)
+- [License](#license)
+- [Roadmap](#roadmap)
+- [Support](#support)
+- [Acknowledgments](#acknowledgments)
+- [Documentation](#documentation)
+<!--toc:end-->
+
 ![Build Status](https://github.com/m-usaid99/Network-Latency-Monitor/actions/workflows/ci.yml/badge.svg)
 [![PyPI version](https://badge.fury.io/py/network-latency-monitor.svg)](https://pypi.org/project/network-latency-monitor/)
 [![Python Versions](https://img.shields.io/pypi/pyversions/network-latency-monitor.svg)](https://pypi.org/project/network-latency-monitor/)
