@@ -55,4 +55,4 @@ jobs:
       # 8. Publish to PyPI
       - name: Publish to PyPI
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        run: poetry publish --build -u __token__ -p ${{ secrets.PYPI_TOKEN }} -vvv
+        run: poetry publish -u __token__ -p ${{ secrets.PYPI_TOKEN }} -vvv
