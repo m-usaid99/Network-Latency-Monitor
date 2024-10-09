@@ -33,6 +33,7 @@ appdirs = "^1.4.4"
 [tool.poetry.group.dev.dependencies]
 safety = "^3.2.8"
 pytest = "^8.3.3"
+pytest-mock = "^3.14.0"
 
 [build-system]
 requires = ["poetry-core"]

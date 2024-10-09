@@ -78,6 +78,7 @@ def load_config(config_file: str = "config.yaml") -> Dict:
     Returns:
         Dict: Configuration dictionary.
     """
+    config = DEFAULT_CONFIG.copy()
     app_name = "network_latency_monitor"  # Replace with your actual application name
     dirs = get_standard_directories(app_name)
     config_dir = dirs["config_dir"]
@@ -99,12 +100,12 @@ def load_config(config_file: str = "config.yaml") -> Dict:
         except yaml.YAMLError as e:
             console.print(f"[bold red]Error parsing the config file: {e}[/bold red]")
             logging.error(f"Error parsing the config file: {e}")
-            config = DEFAULT_CONFIG
+            config = DEFAULT_CONFIG.copy()
         except Exception as e:
             console.print(
                 f"[bold red]Unexpected error loading config file '{config_path}': {e}[/bold red]"
             )
-            config = DEFAULT_CONFIG
+            config = DEFAULT_CONFIG.copy()
     else:
         # Create config.yaml with default settings
         try:
@@ -114,7 +115,7 @@ def load_config(config_file: str = "config.yaml") -> Dict:
             console.print(
                 f"[bold green]Default configuration file created at '{config_path}'. Please review and modify it as needed.[/bold green]"
             )
-            config = DEFAULT_CONFIG
+            config = DEFAULT_CONFIG.copy()
         except Exception as e:
             console.print(
                 f"[bold red]Failed to create default config file '{config_path}': {e}[/bold red]"
