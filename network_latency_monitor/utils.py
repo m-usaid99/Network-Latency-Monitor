@@ -172,16 +172,16 @@ def create_results_directory(config: Dict) -> Path:
     """
     Creates a results subdirectory with a timestamp and returns its path.
 
-    This function generates a unique subdirectory within the results directory based on the current timestamp.
-    It ensures that the directory exists and logs the creation.
-
     Args:
         config (Dict): Configuration dictionary containing settings and directory paths.
 
     Returns:
         Path: The path to the created results subdirectory.
     """
-    results_dir = Path(config.get("results_dir"))
+    results_dir = config.get("results_dir")
+    assert results_dir is not None, "'results_dir' must be set in the configuration."
+    assert isinstance(results_dir, Path), "'results_dir' must be a Path object."
+
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     results_subfolder = results_dir / f"results_{timestamp}"
     try:
@@ -198,4 +198,3 @@ def create_results_directory(config: Dict) -> Path:
         )
         sys.exit(1)
     return results_subfolder
-
