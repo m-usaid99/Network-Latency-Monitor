@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "network-latency-monitor"
-version = "0.1.0"
+version = "0.1.1"
 description = "Monitor your network latency using real-time plots and cumulative plots"
 authors = ["Muhammad Usaid Rehman <rehman.usaid@gmail.com>"]
 homepage = "https://github.com/m-usaid99/Network-Latency-Monitor"

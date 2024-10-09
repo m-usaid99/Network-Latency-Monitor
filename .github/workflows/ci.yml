@@ -29,11 +29,7 @@ jobs:
         with:
           poetry-version: '1.8.3'  # Specify your Poetry version
 
-      # 4. Install dependencies
-      - name: Install dependencies
-        run: poetry install --no-interaction --no-ansi
-
-      # 5. Cache Poetry dependencies (Optional but recommended)
+      # 4. Cache Poetry dependencies (Optional but recommended)
       - name: Cache Poetry dependencies
         uses: actions/cache@v3
         with:
@@ -44,29 +40,21 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-poetry-
 
-      # 6. Run linters (Optional but recommended)
-      # - name: Run Flake8
-      #   run: poetry run flake8 network_latency_monitor tests
+      # 5. Install dependencies
+      - name: Install dependencies
+        run: poetry install --no-interaction --no-ansi
 
-      # 7. Run tests
+      # 6. Run tests
       - name: Run tests
         run: poetry run pytest -v
 
-      # 8. (Optional) Upload coverage reports
-      # - name: Upload coverage
-      #   if: success() && github.event_name != 'pull_request'
-      #   uses: actions/upload-artifact@v3
-      #   with:
-      #     name: coverage-report
-      #     path: coverage.xml
-
-      # 9. (Optional) Build the package
+      # 7. Build the package
       - name: Build package
         run: poetry build
 
-      # 10. (Optional) Publish to PyPI
-      # Uncomment and configure the following steps if you want to publish your package automatically
-      #
+      # 8. Publish to PyPI
       - name: Publish to PyPI
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        run: poetry publish --build -u __token__ -p ${{ secrets.PYPI_TOKEN }}
+        env:
+          POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_TOKEN }}
+        run: poetry publish --build
