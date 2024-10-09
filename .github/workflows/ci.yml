@@ -1,0 +1,72 @@
+# .github/workflows/ci.yml
+
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 2. Set up Python environment
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'  # Specify your Python version
+
+      # 3. Install Poetry
+      - name: Install Poetry
+        uses: abatilo/actions-poetry@v2.1.2
+        with:
+          poetry-version: '1.8.3'  # Specify your Poetry version
+
+      # 4. Install dependencies
+      - name: Install dependencies
+        run: poetry install --no-interaction --no-ansi
+
+      # 5. Cache Poetry dependencies (Optional but recommended)
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pypoetry
+            ~/.cache/pip
+          key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-poetry-
+
+      # 6. Run linters (Optional but recommended)
+      # - name: Run Flake8
+      #   run: poetry run flake8 network_latency_monitor tests
+
+      # 7. Run tests
+      - name: Run tests
+        run: poetry run pytest -v
+
+      # 8. (Optional) Upload coverage reports
+      # - name: Upload coverage
+      #   if: success() && github.event_name != 'pull_request'
+      #   uses: actions/upload-artifact@v3
+      #   with:
+      #     name: coverage-report
+      #     path: coverage.xml
+
+      # 9. (Optional) Build the package
+      - name: Build package
+        run: poetry build
+
+      # 10. (Optional) Publish to PyPI
+      # Uncomment and configure the following steps if you want to publish your package automatically
+      #
+      - name: Publish to PyPI
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: poetry publish --username ${{ secrets.PYPI_USERNAME }} --password ${{ secrets.PYPI_PASSWORD }}
