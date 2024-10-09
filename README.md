@@ -1,12 +1,16 @@
 # NLM: Network Latency Monitor
 
-## Introduction
-
-Welcome to the **Network Latency Monitor (NLM)** documentation.
+![Build Status](https://github.com/m-usaid99/Network-Latency-Monitor/actions/workflows/ci.yml/badge.svg)
+[![PyPI version](https://badge.fury.io/py/network-latency-monitor.svg)](https://pypi.org/project/network-latency-monitor/)
+[![Python Versions](https://img.shields.io/pypi/pyversions/network-latency-monitor.svg)](https://pypi.org/project/network-latency-monitor/)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 NLM is a tool designed to monitor network latency across specified IP
 addresses, providing real-time feedback through progress bars and
 latency graphs.
+
+It also collects data, and plots graphs using `seaborn` to visualize latency data.
+Real-time charts are drawn in the terminal using `asciichartpy`.
 
 **Features include:**
 
@@ -24,7 +28,7 @@ latency graphs.
 You can install **NLM** (Network Latency Monitor) using
 `pip` from PyPI.
 
-**Installation via pip**
+### Installation via pip
 
 ```bash
 pip install network-latency-monitor
@@ -76,11 +80,11 @@ make html
 
    Open `docs/build/html/index.html` in your web browser
 
-## Usage
-
 After installing **NLM**, you can start monitoring network latency.
 
-## Configuration
+## Usage
+
+### Configuration
 
 Before running NLM, configure your settings in the
 [config.yaml]{.title-ref} file.
@@ -190,3 +194,79 @@ nlm --help
   ```bash
   nlm --clear-plots
   ```
+
+## Contributing
+
+Contributions are welcome! If you have suggestions for new features, bug fixes, or improvements, feel free to open an issue or submit a pull request.
+
+### How to Contribute
+
+1. **Fork the repository** to your GitHub account.
+
+2. **Clone your fork** locally:
+
+   ```bash
+   git clone https://github.com/yourusername/network-latency-monitor.git
+   cd network-latency-monitor
+   ```
+
+3. Monitor a single IP for 2 hours, with default settings:
+
+   ```bash
+   git checkout -b feature-branch-name
+   ```
+
+4. Make your changes and ensure the code passes any pre-existing tests or linters.
+
+5. Push your changes to your forked repository:
+
+   ```bash
+   git push origin feature-branch-name
+   ```
+
+6. Submit a pull request to the `main` branch.
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for more details.
+
+## Roadmap
+
+The following features and improvements are planned for future releases of **NLM (Network Latency Monitor)**:
+
+1. **Improve `argparse` Functionality**:
+
+   - Add Verbosity Levels: Introduce options to control output verbosity (e.g., `-v` for verbose mode, `-q` for quiet mode).
+   - Enhanced Error Handling: Improve feedback and error reporting for invalid inputs or failed pings.
+
+    <br/>
+
+2. **Add Support for Multiple Protocols**: Extend support for protocols beyond ICMP (e.g., TCP, UDP) to enable more comprehensive network monitoring.
+
+3. **Data Export Options**: Allow users to export monitoring data in multiple formats such as CSV, JSON, and XML for easier data processing and analysis.
+
+4. **Custom Results and Plots Directory**:
+   Add command-line options to specify custom directories for storing results and plots, making the tool more flexible for use in shell scripts and automated environments.
+
+5. **Improved Plotting Options** (Future): Enhance plotting capabilities with customizable graph styles, better scaling, and export options to PNG and other formats.
+
+## Support
+
+If you encounter any issues, feel free to open an issue on [GitHub Issues](https://github.com/m-usaid99/Network-Latency-Monitor/issues).
+
+## Acknowledgments
+
+- [asciichartpy](https://github.com/kroitor/asciichart) for the ASCII-based chart rendering.
+- [Poetry](https://python-poetry.org/) for Python packaging and dependency management.
+
+## Documentation
+
+Full documentation for **NLM (Network Latency Monitor)** is available at [Read the Docs](https://network-latency-monitor.readthedocs.io/en/latest/).
+
+The documentation includes:
+
+- **Installation Instructions**: Step-by-step guide for installing the tool.
+- **Usage Examples**: Detailed usage examples and advanced configurations.
+- **API Reference**: Auto-generated API reference from code docstrings.
+
+For detailed information, visit the [NLM Documentation](https://network-latency-monitor.readthedocs.io/en/latest/).
