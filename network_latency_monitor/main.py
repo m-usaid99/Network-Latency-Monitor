@@ -36,10 +36,7 @@ from rich.console import Console
 # Initialize Rich Console
 console = Console()
 
-# TODO:
-#       - redo Readme
-#       - refine docs whenever possible
-#       - turn it into publishable package (half-done)
+# TODO: - fix flickering in terminal
 
 
 async def main():
