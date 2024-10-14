@@ -17,6 +17,7 @@ import sys
 from collections import deque
 from pathlib import Path
 from typing import Dict
+from loguru import logger
 
 import asciichartpy
 from rich.columns import Columns
@@ -96,10 +97,9 @@ async def run_ping(
             raw_output = stdout.decode("utf-8").strip()
             error_output = stderr.decode("utf-8").strip()
 
-            # Log raw output for debugging
+            logger.debug(raw_output)
             if error_output:
-                # Use logging as per your central logging setup
-                pass  # Replace with logging.debug(...) if needed
+                logger.debug(error_output)
 
             if proc.returncode == 0:
                 match = latency_regex.search(raw_output)
@@ -314,4 +314,3 @@ async def run_ping_monitoring(config, results_subfolder, latency_data):
 
         # Wait for all tasks to complete
         await asyncio.gather(*tasks)
-

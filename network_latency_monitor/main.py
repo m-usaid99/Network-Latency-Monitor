@@ -17,7 +17,6 @@ import sys
 from collections import deque
 
 from loguru import logger  # Import Loguru's logger
-from rich.console import Console
 
 from network_latency_monitor import (
     create_results_directory,
@@ -34,9 +33,7 @@ from network_latency_monitor import (
     validate_and_get_ips,
     validate_config,
 )
-
-# Initialize Rich Console
-console = Console()
+from network_latency_monitor.console_manager import console
 
 
 # Define a Null Console to suppress output in Quiet Mode
@@ -45,7 +42,9 @@ class NullConsole:
         pass
 
 
-# TODO: - refactor logging to use loguru
+# TODO: - implement multiple verbosity levels
+#       - fix config file console prints
+#       - incorporate use of --yes flag
 #       - try implementing quiet mode
 
 
