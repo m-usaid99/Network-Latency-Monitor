@@ -38,6 +38,13 @@ from network_latency_monitor import (
 # Initialize Rich Console
 console = Console()
 
+
+# Define a Null Console to suppress output in Quiet Mode
+class NullConsole:
+    def print(self, *args, **kwargs):
+        pass
+
+
 # TODO: - refactor logging to use loguru
 #       - try implementing quiet mode
 
@@ -68,6 +75,7 @@ async def main():
         # Starts the NLM tool.
     """
 
+    global console  # Declare 'console' as global at the very beginning
     # Parse command-line arguments
     args = parse_arguments()
 
@@ -86,24 +94,33 @@ async def main():
     validate_config(config)
 
     # Determine verbosity level and map to log levels
-    if args.quiet:
-        # Quiet Mode: Only ERROR and CRITICAL logs
+    verbosity = config.get("verbosity", 0)
+
+    if verbosity == -1:
+        # Quiet Mode
         log_level_file = "ERROR"
-        log_level_console = "ERROR"
-    else:
-        # Start with default log levels
+        log_level_console = "ERROR"  # Not used since console is suppressed
+        active_console = NullConsole()
+    elif verbosity == 0:
+        # Normal Mode
         log_level_file = "INFO"
         log_level_console = "WARNING"
-
-        # Adjust log levels based on verbosity
-        if args.verbose == 1:
-            # Verbose Mode: DEBUG logs for file, INFO for console
-            log_level_file = "DEBUG"
-            log_level_console = "INFO"
-        elif args.verbose >= 2:
-            # Debug Mode: TRACE logs for file, DEBUG for console
-            log_level_file = "DEBUG"  # Loguru does not have TRACE by default
-            log_level_console = "DEBUG"
+        active_console = console
+    elif verbosity == 1:
+        # Verbose Mode
+        log_level_file = "INFO"
+        log_level_console = "INFO"
+        active_console = console
+    elif verbosity >= 2:
+        # Debug Mode
+        log_level_file = "DEBUG"
+        log_level_console = "DEBUG"
+        active_console = console
+    else:
+        # Fallback to Normal Mode
+        log_level_file = "INFO"
+        log_level_console = "WARNING"
+        active_console = console
 
     # Setup logging with determined log levels
     setup_logging(
@@ -111,6 +128,9 @@ async def main():
         log_level_file=log_level_file,
         log_level_console=log_level_console,
     )
+
+    # Assign the active console based on verbosity
+    console = active_console
 
     # Handle clear operations if any
     handle_clear_operations(config)
@@ -165,7 +185,7 @@ def cli():
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        logger.error("Ping monitoring interrupted by user.")
+        logger.info("Ping monitoring interrupted by user.")
         console.print("\n[bold red]Ping monitoring interrupted by user.[/bold red]")
         sys.exit(0)
 

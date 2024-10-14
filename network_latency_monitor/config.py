@@ -40,6 +40,7 @@ DEFAULT_CONFIG = {
     "clear_plots": False,  # Set to True to clear plots folder
     "clear_logs": False,  # Set to True to clear logs folder
     "yes": False,  # Set to True to auto-confirm prompts
+    "verbosity": 0,  # 0: Normal, 1: Verbose, 2: Debug
 }
 
 
@@ -226,7 +227,6 @@ def merge_args_into_config(args, config: Dict) -> Dict:
         "clear_logs": "clear_logs",
         "clear_plots": "clear_plots",
         "yes": "yes",
-        # Add more mappings if needed
     }
 
     for arg_name, config_key in arg_to_config_map.items():
@@ -237,6 +237,13 @@ def merge_args_into_config(args, config: Dict) -> Dict:
     # Handle positional arguments like ip_addresses
     if hasattr(args, "ip_addresses") and args.ip_addresses:
         config["ip_addresses"] = args.ip_addresses
+
+    # Handle verbosity and quiet flags from CLI
+    if hasattr(args, "quiet") and args.quiet:
+        config["verbosity"] = -1  # Special value for Quiet Mode
+    elif hasattr(args, "verbose") and args.verbose > 0:
+        config["verbosity"] = min(args.verbose, 2)  # Cap at 2 for Debug Mode
+    # If neither quiet nor verbose flags are set, retain config file's verbosity
 
     return config
 
@@ -282,4 +289,15 @@ def validate_config(config: Dict) -> None:
         logging.error("No IP addresses specified in configuration.")
         sys.exit(1)
 
+    # Validate verbosity
+    verbosity = config.get("verbosity", 0)
+    if verbosity == -1:
+        # Quiet Mode
+        pass  # No additional validation needed
+    elif not isinstance(verbosity, int) or not (0 <= verbosity <= 2):
+        console.print(
+            "[bold red]Invalid verbosity level in configuration. Must be 0 (Normal), 1 (Verbose), or 2 (Debug). Use -q for Quiet Mode.[/bold red]"
+        )
+        logging.error("Invalid verbosity level in configuration.")
+        sys.exit(1)
     # Additional validations can be added here as needed

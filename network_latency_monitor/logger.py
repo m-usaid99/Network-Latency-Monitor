@@ -31,12 +31,6 @@ def setup_logging(
     """
     Configures the logging settings for the NLM tool with log rotation and appropriate sinks.
 
-    This function sets up the logging system by creating a log directory if it doesn't exist,
-    initializing a log file with a timestamped name, and configuring both file and console
-    sinks with specified logging levels. It also implements log rotation to prevent log
-    files from growing indefinitely and ensures that logging is configured only once to
-    avoid duplicate log entries.
-
     Args:
         log_folder (str): The directory where log files will be stored.
         log_level_file (str, optional): Logging level for the file sink. Defaults to "INFO".
@@ -46,9 +40,6 @@ def setup_logging(
 
     Raises:
         OSError: If the log directory cannot be created due to permission issues or other OS-related errors.
-
-    Example:
-        >>> setup_logging(log_folder="logs")
     """
     global _logger_initialized
 
@@ -73,7 +64,7 @@ def setup_logging(
             log_file,
             level=log_level_file,
             rotation=rotation,
-            retention=retention,
+            retention=retention,  # Pass retention as an integer
             encoding="utf-8",
             enqueue=True,  # Ensures thread-safe logging
             serialize=False,  # Set to True if you prefer JSON logs
@@ -102,4 +93,3 @@ def setup_logging(
     except OSError as e:
         print(f"Failed to create log directory '{log_folder}': {e}", file=sys.stderr)
         raise
-

@@ -137,13 +137,15 @@ def parse_arguments() -> argparse.Namespace:
     # Verbosity flags
     verbosity = parser.add_argument_group("Verbosity Options")
 
-    verbosity.add_argument(
+    verbosity_group = verbosity.add_mutually_exclusive_group()
+
+    verbosity_group.add_argument(
         "-q",
         "--quiet",
         action="store_true",
         help="Suppress all non-critical output.",
     )
-    verbosity.add_argument(
+    verbosity_group.add_argument(
         "-v",
         "--verbose",
         action="count",
