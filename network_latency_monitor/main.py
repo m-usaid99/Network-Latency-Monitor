@@ -158,7 +158,7 @@ async def main():
             "[bold blue]Starting ping monitoring...[/bold blue]"
         )
     logger.info("Ping monitoring initiated.")
-    await run_ping_monitoring(config, results_subfolder, latency_data)
+    await run_ping_monitoring(config, results_subfolder, latency_data, verbosity)
     logger.info("Ping monitoring completed.")
     if verbosity != -1:
         console_proxy.console.print(

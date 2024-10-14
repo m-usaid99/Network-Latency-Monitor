@@ -32,4 +32,3 @@ class ConsoleProxy:
 
 # Instantiate a global ConsoleProxy
 console_proxy = ConsoleProxy()
-
