@@ -36,10 +36,13 @@ from network_latency_monitor import (
 from network_latency_monitor.ping_manager import run_ping_monitoring_quiet
 from network_latency_monitor.console_manager import NullConsole, console_proxy
 
-# TODO: - implement multiple verbosity levels
-#       - fix config file console prints
-#       - incorporate use of --yes flag
-#       - try implementing quiet mode
+# TODO: (15/10/24)  - implement verbosity levels
+#                   - refactor log statements in all files to use loguru
+#                   - refactor plot_generator.py to suppress console output for -q
+#                   - update documentation for verbosity flags
+#                   - incorporate use of --yes flag
+#                       - fix console.print statements in config.py
+#                       - bypass warnings and confirmations
 
 
 async def main():
