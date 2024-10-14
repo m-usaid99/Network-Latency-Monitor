@@ -16,11 +16,11 @@ import re
 import sys
 from collections import deque
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict
 
 import asciichartpy
 from rich.columns import Columns
-from rich.console import Group
+from rich.console import Console, Group
 from rich.live import Live
 from rich.panel import Panel
 from rich.progress import (
@@ -34,8 +34,7 @@ from rich.progress import (
 )
 from rich.text import Text
 
-from loguru import logger  # Import Loguru's logger
-from network_latency_monitor.console_manager import console_proxy
+console = Console()
 
 
 async def run_ping(
@@ -43,8 +42,8 @@ async def run_ping(
     duration: int,
     interval: int,
     results_file: Path,
-    progress: Optional[Progress],
-    task_id: Optional[TaskID],
+    progress: Progress,
+    task_id: TaskID,
     latency_data: Dict[str, deque],
 ):
     """
@@ -59,8 +58,8 @@ async def run_ping(
         duration (int): Total duration for which to ping, in seconds.
         interval (int): Interval between consecutive pings, in seconds.
         results_file (Path): Path to the file where ping results are recorded.
-        progress (Optional[Progress]): Rich Progress instance to update the progress bar.
-        task_id (Optional[TaskID]): Identifier for the specific progress task.
+        progress (Progress): Rich Progress instance to update the progress bar.
+        task_id (TaskID): Identifier for the specific progress task.
         latency_data (Dict[str, deque]): Dictionary storing latency data for each IP address.
     """
     loop = asyncio.get_event_loop()
@@ -99,7 +98,8 @@ async def run_ping(
 
             # Log raw output for debugging
             if error_output:
-                logger.debug(f"Ping error for {ip_address}: {error_output}")
+                # Use logging as per your central logging setup
+                pass  # Replace with logging.debug(...) if needed
 
             if proc.returncode == 0:
                 match = latency_regex.search(raw_output)
@@ -107,14 +107,12 @@ async def run_ping(
                     current_latency = float(match.group(1))
                 else:
                     current_latency = None
-                    logger.warning(
-                        f"Failed to parse latency from ping output for {ip_address}."
-                    )
+                    # Use logging as per your central logging setup
+                    pass  # Replace with logging.warning(...) if needed
             else:
                 current_latency = None
-                logger.error(
-                    f"Ping command failed for {ip_address} with return code {proc.returncode}."
-                )
+                # Use logging as per your central logging setup
+                pass  # Replace with logging.error(...) if needed
 
             # Write the result to the file with explicit encoding
             with results_file.open("a", encoding="utf-8") as f:
@@ -124,7 +122,8 @@ async def run_ping(
                     f.write("Lost\n")
 
         except Exception as e:
-            logger.error(f"Exception during pinging {ip_address}: {e}")
+            # Use logging as per your central logging setup
+            pass  # Replace with logging.error(...) if needed
             current_latency = None  # Ensure current_latency is defined
             # Write the error to the file with explicit encoding
             with results_file.open("a", encoding="utf-8") as f:
@@ -138,23 +137,21 @@ async def run_ping(
 
             if current_latency is not None:
                 display_latency = min(current_latency, 800.0)
-                description = f"[cyan]{ip_address} - {display_latency} ms"
-                if progress and task_id is not None:
-                    progress.update(
-                        task_id,
-                        advance=elapsed_since_last_update,
-                        description=description,
-                    )
+                description = f"Pinging [cyan]{ip_address} - {display_latency} ms"
+                progress.update(
+                    task_id,
+                    advance=elapsed_since_last_update,
+                    description=description,
+                )
                 # Update in-memory latency data
                 latency_data[ip_address].append(current_latency)
             else:
-                description = f"[cyan]{ip_address} - Lost"
-                if progress and task_id is not None:
-                    progress.update(
-                        task_id,
-                        advance=elapsed_since_last_update,
-                        description=description,
-                    )
+                description = f"Pinging [cyan]{ip_address} - Lost"
+                progress.update(
+                    task_id,
+                    advance=elapsed_since_last_update,
+                    description=description,
+                )
                 # Append 0 to represent lost ping
                 latency_data[ip_address].append(0)
 
@@ -166,11 +163,10 @@ async def run_ping(
             await asyncio.sleep(sleep_time)
 
     # Ensure the progress bar reaches 100%
-    if progress and task_id is not None:
-        progress.update(task_id, completed=duration)
+    progress.update(task_id, completed=duration)
 
 
-async def run_ping_monitoring(config, results_subfolder, latency_data, verbosity):
+async def run_ping_monitoring(config, results_subfolder, latency_data):
     """
     Initiates ping monitoring for multiple IP addresses with progress bars and real-time graphs.
 
@@ -182,37 +178,29 @@ async def run_ping_monitoring(config, results_subfolder, latency_data, verbosity
         config (dict): Configuration dictionary containing settings like duration, ping intervals, IP addresses, etc.
         results_subfolder (Path): Path to the directory where ping results will be stored.
         latency_data (Dict[str, deque]): Dictionary to store latency data for each IP address.
-        verbosity (int): Verbosity level from the configuration.
     """
     duration = config.get("duration", 10800)
     ping_interval = config.get("ping_interval", 1)
     ips = config["ip_addresses"]
     tasks = []
 
-    # Initialize Progress only if not in Quiet Mode
-    if verbosity != -1:
-        # Initialize Rich Progress with shared console
-        progress = Progress(
-            SpinnerColumn(),
-            TextColumn("[bold blue]{task.description}"),
-            BarColumn(),
-            "[progress.percentage]{task.percentage:>3.1f}%",
-            TimeElapsedColumn(),
-            TimeRemainingColumn(),
-            console=console_proxy.console,  # Use the shared console
-            transient=False,
-        )
-    else:
-        progress = None
+    # Initialize Rich Progress
+    progress = Progress(
+        SpinnerColumn(),
+        TextColumn("[bold blue]{task.description}"),
+        BarColumn(),
+        "[progress.percentage]{task.percentage:>3.1f}%",
+        TimeElapsedColumn(),
+        TimeRemainingColumn(),
+        console=console,
+        transient=False,
+    )
 
     # Create tasks for each IP
     task_id_map = {}
     for ip in ips:
         results_file = results_subfolder / f"ping_results_{ip}.txt"
-        if progress:
-            task_id = progress.add_task(f"Pinging [cyan]{ip}[/cyan]", total=duration)
-        else:
-            task_id = None  # No task ID needed in Quiet Mode
+        task_id = progress.add_task(f"Pinging [cyan]{ip}[/cyan]", total=duration)
         task_id_map[ip] = task_id
         task = asyncio.create_task(
             run_ping(
@@ -227,115 +215,199 @@ async def run_ping_monitoring(config, results_subfolder, latency_data, verbosity
         )
         tasks.append(task)
 
-    # Handle Live and Progress based on verbosity
-    if progress:
-        # Calculate dynamic graph dimensions
-        terminal_width = console_proxy.console.size.width
-        terminal_height = console_proxy.console.size.height
-        reserved_height = 10  # Reserve some lines for margins and other info
-        progress_bar_height = len(ips) * 3  # Approximate progress bar height
-        available_height = terminal_height - reserved_height - progress_bar_height
-        graph_height = (
-            max(5, available_height // len(ips)) if len(ips) > 0 else 5
-        )  # Ensure a minimum height
+    # Calculate dynamic graph dimensions
+    terminal_width = console.size.width
+    terminal_height = console.size.height
+    reserved_height = 10  # Reserve some lines for margins and other info
+    progress_bar_height = len(ips) * 3  # Approximate progress bar height
+    available_height = terminal_height - reserved_height - progress_bar_height
+    graph_height = (
+        max(5, available_height // len(ips)) if len(ips) > 0 else 5
+    )  # Ensure a minimum height
 
-        # Define a sliding window size
-        window_size = 50  # Number of recent data points to display
+    # Define a sliding window size
+    window_size = 50  # Number of recent data points to display
 
-        with progress:
-            with Live(console=console_proxy.console, refresh_per_second=4) as live:
-                while not all(task.done() for task in tasks):
-                    # Generate ASCII charts
-                    charts = []
-                    for ip in ips:
-                        data = list(latency_data[ip])[-window_size:]
-                        current_max = max(data) if data else 100
-                        plot_max = max(
-                            current_max, 100
-                        )  # Ensure plot max is at least 100ms
+    # Start the Live context
+    with Live(console=console, refresh_per_second=4) as live:
+        while not all(task.done() for task in tasks):
+            # Generate ASCII charts
+            charts = []
+            for ip in ips:
+                data = list(latency_data[ip])[-window_size:]
+                current_max = max(data) if data else 100
+                plot_max = max(current_max, 100)  # Ensure plot max is at least 100ms
 
-                        # Determine graph width based on number of columns
-                        if len(ips) == 1:
-                            graph_width = (
-                                terminal_width - 10
-                            )  # Use most of the terminal width for a single IP
-                        elif len(ips) <= 2:
-                            graph_width = (
-                                terminal_width // 2
-                            ) - 10  # Split the terminal width between two IPs
-                        else:
-                            graph_width = (
-                                terminal_width // 3
-                            ) - 10  # Adjust as needed for more IPs
+                # Determine graph width based on number of columns
+                if len(ips) == 1:
+                    graph_width = (
+                        terminal_width - 10
+                    )  # Use most of the terminal width for a single IP
+                elif len(ips) <= 2:
+                    graph_width = (
+                        terminal_width // 2
+                    ) - 10  # Split the terminal width between two IPs
+                else:
+                    graph_width = (
+                        terminal_width // 3
+                    ) - 10  # Adjust as needed for more IPs
 
-                        chart = asciichartpy.plot(
-                            data,
-                            {
-                                "height": graph_height,
-                                "min": 0,
-                                "max": plot_max,
-                                "format": "{:>6.1f}",
-                                "padding": 1,
-                                "width": graph_width,
-                            },
-                        )
+                chart = asciichartpy.plot(
+                    data,
+                    {
+                        "height": graph_height,
+                        "min": 0,
+                        "max": plot_max,
+                        "format": "{:>6.1f}",
+                        "padding": 1,
+                        "width": graph_width,
+                    },
+                )
 
-                        # Determine color based on current max latency
-                        if current_max < 75:
-                            color = "green"
-                        elif current_max < 125:
-                            color = "yellow"
-                        else:
-                            color = "red"
+                # Determine color based on current max latency
+                if current_max < 75:
+                    color = "green"
+                elif current_max < 125:
+                    color = "yellow"
+                else:
+                    color = "red"
 
-                        colored_chart = f"[{color}]{chart}[/{color}]"
-                        charts.append(
-                            Panel(colored_chart, title=f"IP: {ip}", border_style=color)
-                        )
+                colored_chart = f"[{color}]{chart}[/{color}]"
+                charts.append(
+                    Panel(colored_chart, title=f"IP: {ip}", border_style=color)
+                )
 
-                    # Organize charts into columns
-                    if len(charts) > 1:
-                        charts_renderable = Columns(charts, equal=True)
-                    else:
-                        charts_renderable = (
-                            charts[0]
-                            if charts
-                            else Panel(
-                                "No Data",
-                                title="Real-time Latency Graphs",
-                                border_style="grey",
-                            )
-                        )
-
-                    # Create the legend panel with markup enabled
-                    legend_text = Text.from_markup(
-                        "Legend: [green]Green[/green] < 75ms | [yellow]Yellow[/yellow] 75ms-125ms | [red]Red[/red] > 125ms",
-                        style="bold",
+            # Organize charts into columns
+            if len(charts) > 1:
+                charts_renderable = Columns(charts, equal=True)
+            else:
+                charts_renderable = (
+                    charts[0]
+                    if charts
+                    else Panel(
+                        "No Data", title="Real-time Latency Graphs", border_style="grey"
                     )
-                    legend_panel = Panel(legend_text, border_style="none", expand=False)
+                )
 
-                    # Combine charts and legend
-                    charts_renderable = Group(charts_renderable, legend_panel)
+            # Create the legend panel with markup enabled
+            legend_text = Text.from_markup(
+                "Legend: [green]Green[/green] < 75ms | [yellow]Yellow[/yellow] 75ms-125ms | [red]Red[/red] > 125ms",
+                style="bold",
+            )
+            legend_panel = Panel(legend_text, border_style="none", expand=False)
 
-                    # Create a panel for progress bars
-                    progress_renderable = Panel(
-                        progress,
-                        title="Ping Progress",
-                        border_style="blue",
-                        expand=False,
-                    )
+            # Combine charts and legend
+            charts_renderable = Group(charts_renderable, legend_panel)
 
-                    # Combine progress and charts into a single renderable
-                    combined = Group(progress_renderable, charts_renderable)
+            # Render the progress bars
+            progress_renderable = Panel(
+                progress, title="Ping Progress", border_style="blue", expand=False
+            )
 
-                    # Update the Live display
-                    live.update(combined)
+            # Combine progress and charts into a single renderable
+            combined = Group(progress_renderable, charts_renderable)
 
-                    await asyncio.sleep(0.5)  # Adjust the sleep time as needed
+            # Update the Live display
+            live.update(combined)
 
-            # Wait for all tasks to complete
-            await asyncio.gather(*tasks)
-    else:
-        # In Quiet Mode, simply wait for all tasks to complete
+            await asyncio.sleep(0.5)  # Adjust the sleep time as needed
+
+        # Wait for all tasks to complete
         await asyncio.gather(*tasks)
 
+
+async def run_ping_quiet(
+    ip_address: str,
+    duration: int,
+    interval: int,
+    results_file: Path,
+    latency_data: Dict[str, deque],
+):
+    """
+    Executes the ping command for a specific IP address, records latency, without console output.
+    """
+    loop = asyncio.get_event_loop()
+    start_time = loop.time()
+    end_time = start_time + duration
+
+    if sys.platform.startswith("win"):
+        ping_cmd = ["ping", "-n", "1", "-w", str(interval * 1000), ip_address]
+        latency_regex = re.compile(r"time[=<]\s*(\d+\.?\d*)ms")
+    else:
+        ping_cmd = ["ping", "-c", "1", "-W", str(interval), ip_address]
+        latency_regex = re.compile(r"time\s*=\s*(\d+\.?\d*)\s*ms")
+
+    while True:
+        current_time = loop.time()
+        if current_time >= end_time:
+            break
+
+        try:
+            # Execute the ping command
+            proc = await asyncio.create_subprocess_exec(
+                *ping_cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr = await proc.communicate()
+
+            raw_output = stdout.decode("utf-8").strip()
+
+            if proc.returncode == 0:
+                match = latency_regex.search(raw_output)
+                if match:
+                    current_latency = float(match.group(1))
+                else:
+                    current_latency = None
+            else:
+                current_latency = None
+
+            # Write the result to the file with explicit encoding
+            with results_file.open("a", encoding="utf-8") as f:
+                if current_latency is not None:
+                    f.write(f"{current_latency}\n")
+                else:
+                    f.write("Lost\n")
+
+        except Exception as e:
+            current_latency = None  # Ensure current_latency is defined
+            # Write the error to the file with explicit encoding
+            with results_file.open("a", encoding="utf-8") as f:
+                f.write(f"Error: {e}\n")
+
+        finally:
+            # Update in-memory latency data
+            if current_latency is not None:
+                latency_data[ip_address].append(current_latency)
+            else:
+                # Append 0 to represent lost ping
+                latency_data[ip_address].append(0)
+
+        # Sleep until the next interval
+        await asyncio.sleep(interval)
+
+
+async def run_ping_monitoring_quiet(config, results_subfolder, latency_data):
+    """
+    Initiates ping monitoring for multiple IP addresses without console output.
+    """
+    duration = config.get("duration", 10800)
+    ping_interval = config.get("ping_interval", 1)
+    ips = config["ip_addresses"]
+    tasks = []
+
+    for ip in ips:
+        results_file = results_subfolder / f"ping_results_{ip}.txt"
+        task = asyncio.create_task(
+            run_ping_quiet(
+                ip_address=ip,
+                duration=duration,
+                interval=ping_interval,
+                results_file=results_file,
+                latency_data=latency_data,
+            )
+        )
+        tasks.append(task)
+
+    # Wait for all tasks to complete
+    await asyncio.gather(*tasks)

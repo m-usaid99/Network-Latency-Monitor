@@ -33,6 +33,7 @@ from network_latency_monitor import (
     validate_and_get_ips,
     validate_config,
 )
+from network_latency_monitor.ping_manager import run_ping_monitoring_quiet
 from network_latency_monitor.console_manager import NullConsole, console_proxy
 
 # TODO: - implement multiple verbosity levels
@@ -158,7 +159,11 @@ async def main():
             "[bold blue]Starting ping monitoring...[/bold blue]"
         )
     logger.info("Ping monitoring initiated.")
-    await run_ping_monitoring(config, results_subfolder, latency_data, verbosity)
+    # Start ping monitoring with or without console output based on verbosity
+    if verbosity == -1:
+        await run_ping_monitoring_quiet(config, results_subfolder, latency_data)
+    else:
+        await run_ping_monitoring(config, results_subfolder, latency_data)
     logger.info("Ping monitoring completed.")
     if verbosity != -1:
         console_proxy.console.print(
