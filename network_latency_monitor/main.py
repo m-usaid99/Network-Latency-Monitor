@@ -18,7 +18,7 @@ from collections import deque
 
 from rich.console import Console
 
-from network_latency_monitor import (  # Updated import assuming config.py is in the same directory or appropriately referenced
+from network_latency_monitor import (
     create_results_directory,
     display_plots_and_summary,
     handle_clear_operations,
@@ -29,7 +29,7 @@ from network_latency_monitor import (  # Updated import assuming config.py is in
     process_ping_results,
     regenerate_default_config,
     run_ping_monitoring,
-    setup_logging,  # Ensure this is correctly implemented in your config or another module
+    setup_logging,
     validate_and_get_ips,
     validate_config,
 )
@@ -37,7 +37,8 @@ from network_latency_monitor import (  # Updated import assuming config.py is in
 # Initialize Rich Console
 console = Console()
 
-# TODO:
+# TODO: - refactor logging to use loguru
+#       - try implementing quiet mode
 
 
 async def main():
