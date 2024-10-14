@@ -17,16 +17,15 @@ Functions:
 
 from datetime import datetime
 import ipaddress
-import logging
 import shutil
 import sys
 from pathlib import Path
 from typing import Dict, List
 
-from rich.console import Console
 from rich.prompt import Prompt
 
-console = Console()
+from loguru import logger  # Use loguru logger
+from network_latency_monitor.console_manager import console_proxy  # Use custom console
 
 
 def clear_data(folders_to_clear: List[Path]) -> None:
@@ -47,10 +46,11 @@ def clear_data(folders_to_clear: List[Path]) -> None:
         try:
             if folder_path.exists():
                 shutil.rmtree(folder_path)
+                logger.info(f"Successfully cleared folder: {folder_path}")
             else:
-                logging.warning(f"Folder not found: {folder_path}")
+                logger.warning(f"Folder not found: {folder_path}")
         except OSError as e:
-            logging.error(f"Failed to clear folder '{folder_path}': {e}")
+            logger.error(f"Failed to clear folder '{folder_path}': {e}")
             raise
 
 
@@ -69,10 +69,17 @@ def ask_confirmation(message: str, auto_confirm: bool) -> bool:
         bool: True if the user confirms, False otherwise.
     """
     if auto_confirm:
+        logger.debug("Auto-confirmation is enabled. Skipping user prompt.")
         return True
 
-    response = Prompt.ask(f"{message}", choices=["y", "n"], default="n")
-    return response.lower() in ["y", "yes"]
+    try:
+        response = Prompt.ask(f"{message}", choices=["y", "n"], default="n")
+        confirmation = response.lower() in ["y", "yes"]
+        logger.debug(f"User response: {'Yes' if confirmation else 'No'}")
+        return confirmation
+    except Exception as e:
+        logger.error(f"Error during user confirmation prompt: {e}")
+        return False
 
 
 def handle_clear_operations(config: Dict) -> None:
@@ -100,7 +107,7 @@ def handle_clear_operations(config: Dict) -> None:
             config.get("log_dir"),
         ]
         confirmation_message = (
-            "Are you sure you want to clear ALL data (results, plots, logs)?"
+            "Are you sure you want to clear ALL data (results, plots, logs)? [y/n]"
         )
     else:
         if config.get("clear_results", False):
@@ -110,7 +117,9 @@ def handle_clear_operations(config: Dict) -> None:
         if config.get("clear_logs", False):
             folders_to_clear.append(config.get("log_dir"))
         if folders_to_clear:
-            confirmation_message = "[bold yellow]Are you sure you want to clear the selected data?[/bold yellow]"
+            confirmation_message = (
+                "Are you sure you want to clear the selected data? [y/n]"
+            )
 
     # Convert folder paths to Path objects
     folders_to_clear = [Path(folder) for folder in folders_to_clear if folder]
@@ -118,11 +127,15 @@ def handle_clear_operations(config: Dict) -> None:
     if folders_to_clear:
         if ask_confirmation(confirmation_message, config.get("yes", False)):
             clear_data(folders_to_clear)
-            console.print(
+            console_proxy.console.print(
                 "[bold green]Selected data has been cleared successfully.[/bold green]"
             )
+            logger.info("Selected data has been cleared successfully.")
         else:
-            console.print("[bold yellow]Clear operation canceled.[/bold yellow]")
+            console_proxy.console.print(
+                "[bold yellow]Clear operation canceled.[/bold yellow]"
+            )
+            logger.info("Clear operation canceled by the user.")
         sys.exit(0)  # Exit after clearing
 
 
@@ -146,9 +159,10 @@ def validate_and_get_ips(config: Dict) -> List[str]:
 
     if not ips:
         default_ip = ["8.8.8.8"]
-        console.print(
+        console_proxy.console.print(
             f"[bold yellow]No IP addresses provided. Using default IP:[/bold yellow] {default_ip[0]}"
         )
+        logger.warning("No IP addresses provided. Using default IP: 8.8.8.8")
         ips = default_ip
 
     validated_ips = []
@@ -156,15 +170,21 @@ def validate_and_get_ips(config: Dict) -> List[str]:
         try:
             ipaddress.ip_address(ip)
             validated_ips.append(ip)
+            logger.debug(f"Validated IP address: {ip}")
         except ValueError:
-            console.print(f"[bold red]Invalid IP address:[/bold red] {ip}")
-            logging.error(f"Invalid IP address provided: {ip}")
+            console_proxy.console.print(
+                f"[bold red]Invalid IP address:[/bold red] {ip}"
+            )
+            logger.error(f"Invalid IP address provided: {ip}")
 
     if not validated_ips:
-        console.print("[bold red]No valid IP addresses provided. Exiting.[/bold red]")
-        logging.error("No valid IP addresses provided. Exiting.")
+        console_proxy.console.print(
+            "[bold red]No valid IP addresses provided. Exiting.[/bold red]"
+        )
+        logger.error("No valid IP addresses provided. Exiting.")
         sys.exit(1)
 
+    logger.info(f"Validated IP addresses: {validated_ips}")
     return validated_ips
 
 
@@ -179,21 +199,29 @@ def create_results_directory(config: Dict) -> Path:
         Path: The path to the created results subdirectory.
     """
     results_dir = config.get("results_dir")
-    assert results_dir is not None, "'results_dir' must be set in the configuration."
-    assert isinstance(results_dir, Path), "'results_dir' must be a Path object."
+    if not results_dir:
+        console_proxy.console.print(
+            "[bold red]'results_dir' must be set in the configuration.[/bold red]"
+        )
+        logger.error("'results_dir' must be set in the configuration.")
+        sys.exit(1)
+
+    if not isinstance(results_dir, Path):
+        results_dir = Path(results_dir)
 
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     results_subfolder = results_dir / f"results_{timestamp}"
     try:
         results_subfolder.mkdir(parents=True, exist_ok=True)
-        console.print(
+        console_proxy.console.print(
             f"[bold green]Created results subdirectory:[/bold green] {results_subfolder}"
         )
+        logger.info(f"Created results subdirectory: {results_subfolder}")
     except OSError as e:
-        console.print(
+        console_proxy.console.print(
             f"[bold red]Failed to create results subdirectory:[/bold red] {results_subfolder}"
         )
-        logging.error(
+        logger.error(
             f"Failed to create results subdirectory '{results_subfolder}': {e}"
         )
         sys.exit(1)
