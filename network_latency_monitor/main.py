@@ -15,7 +15,7 @@ Functions:
 import asyncio
 import sys
 from collections import deque
-
+from rich.console import Console
 from loguru import logger  # Import Loguru's logger
 
 from network_latency_monitor import (
@@ -33,14 +33,7 @@ from network_latency_monitor import (
     validate_and_get_ips,
     validate_config,
 )
-from network_latency_monitor.console_manager import console
-
-
-# Define a Null Console to suppress output in Quiet Mode
-class NullConsole:
-    def print(self, *args, **kwargs):
-        pass
-
+from network_latency_monitor.console_manager import NullConsole, console_proxy
 
 # TODO: - implement multiple verbosity levels
 #       - fix config file console prints
@@ -74,7 +67,6 @@ async def main():
         # Starts the NLM tool.
     """
 
-    global console  # Declare 'console' as global at the very beginning
     # Parse command-line arguments
     args = parse_arguments()
 
@@ -104,22 +96,22 @@ async def main():
         # Normal Mode
         log_level_file = "INFO"
         log_level_console = "WARNING"
-        active_console = console
+        active_console = Console()  # Reuse the real Console
     elif verbosity == 1:
         # Verbose Mode
         log_level_file = "INFO"
         log_level_console = "INFO"
-        active_console = console
+        active_console = Console()
     elif verbosity >= 2:
         # Debug Mode
         log_level_file = "DEBUG"
         log_level_console = "DEBUG"
-        active_console = console
+        active_console = Console()
     else:
         # Fallback to Normal Mode
         log_level_file = "INFO"
         log_level_console = "WARNING"
-        active_console = console
+        active_console = Console()
 
     # Setup logging with determined log levels
     setup_logging(
@@ -129,7 +121,10 @@ async def main():
     )
 
     # Assign the active console based on verbosity
-    console = active_console
+    console_proxy.set_console(active_console)
+
+    # Log that logging has been set up
+    logger.info("Logging has been configured successfully.")
 
     # Handle clear operations if any
     handle_clear_operations(config)
@@ -158,9 +153,17 @@ async def main():
     logger.debug(f"Initialized latency data storage: {latency_data}")
 
     # Start ping monitoring with enhanced progress bars and real-time charts
-    console.print("[bold blue]Starting ping monitoring...[/bold blue]")
+    if verbosity != -1:
+        console_proxy.console.print(
+            "[bold blue]Starting ping monitoring...[/bold blue]"
+        )
+    logger.info("Ping monitoring initiated.")
     await run_ping_monitoring(config, results_subfolder, latency_data)
-    console.print("[bold green]Ping monitoring completed.[/bold green]")
+    logger.info("Ping monitoring completed.")
+    if verbosity != -1:
+        console_proxy.console.print(
+            "[bold green]Ping monitoring completed.[/bold green]"
+        )
 
     # Process ping results
     data_dict = process_ping_results(results_subfolder, config)
@@ -168,6 +171,7 @@ async def main():
 
     # Generate plots and display summary statistics
     display_plots_and_summary(data_dict, config)
+    logger.info("Plots generated and summary statistics displayed.")
 
 
 def cli():
@@ -184,8 +188,18 @@ def cli():
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        logger.info("Ping monitoring interrupted by user.")
-        console.print("\n[bold red]Ping monitoring interrupted by user.[/bold red]")
+        logger.warning("Ping monitoring interrupted by user.")
+        verbosity = 0
+        try:
+            config = load_config()
+            verbosity = config.get("verbosity", 0)
+        except:  # noqa: E722
+            logger.info("will replace with real logic later.")
+
+        if verbosity != -1:
+            console_proxy.console.print(
+                "\n[bold red]Ping monitoring interrupted by user.[/bold red]"
+            )
         sys.exit(0)
 
 

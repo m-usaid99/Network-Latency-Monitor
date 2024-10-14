@@ -97,9 +97,8 @@ async def run_ping(
             raw_output = stdout.decode("utf-8").strip()
             error_output = stderr.decode("utf-8").strip()
 
-            logger.debug(raw_output)
             if error_output:
-                logger.debug(error_output)
+                pass
 
             if proc.returncode == 0:
                 match = latency_regex.search(raw_output)
