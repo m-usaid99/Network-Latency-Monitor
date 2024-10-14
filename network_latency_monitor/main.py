@@ -16,6 +16,8 @@ import asyncio
 import sys
 from collections import deque
 
+from rich.console import Console
+
 from network_latency_monitor import (  # Updated import assuming config.py is in the same directory or appropriately referenced
     create_results_directory,
     display_plots_and_summary,
@@ -31,12 +33,11 @@ from network_latency_monitor import (  # Updated import assuming config.py is in
     validate_and_get_ips,
     validate_config,
 )
-from rich.console import Console
 
 # Initialize Rich Console
 console = Console()
 
-# TODO: - fix flickering in terminal
+# TODO:
 
 
 async def main():
