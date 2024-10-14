@@ -3,47 +3,46 @@
 """
 Logging Configuration
 
-Sets up logging for the Network Latency Monitor (NLM) tool. This module initializes
+Sets up logging for the Network Latency Monitor (NLM) tool using Loguru. This module initializes
 the logging system, ensuring that logs are properly formatted and stored in designated
 log files with appropriate log levels. It implements log rotation to manage log file sizes
 and prevents duplicate log entries by configuring the logger as a singleton.
 
 Functions:
-    - setup_logging: Configures logging settings with log rotation and appropriate handlers.
+    - setup_logging: Configures logging settings with log rotation and appropriate sinks.
 """
 
 from datetime import datetime
 from pathlib import Path
-import logging
-from logging.handlers import RotatingFileHandler
 import sys
+from loguru import logger
 
-# Define a module-level logger to implement the Singleton pattern
+# Define a module-level flag to implement the Singleton pattern
 _logger_initialized = False
 
 
 def setup_logging(
     log_folder: str,
-    log_level_file: int = logging.INFO,
-    log_level_console: int = logging.WARNING,
-    max_bytes: int = 5 * 1024 * 1024,  # 5 MB
-    backup_count: int = 5,
+    log_level_file: str = "INFO",
+    log_level_console: str = "WARNING",
+    rotation: str = "5 MB",
+    retention: int = 5,  # Number of backup log files to keep
 ) -> None:
     """
-    Configures the logging settings for the NLM tool with log rotation and appropriate handlers.
+    Configures the logging settings for the NLM tool with log rotation and appropriate sinks.
 
     This function sets up the logging system by creating a log directory if it doesn't exist,
     initializing a log file with a timestamped name, and configuring both file and console
-    handlers with specified logging levels. It also implements log rotation to prevent log
+    sinks with specified logging levels. It also implements log rotation to prevent log
     files from growing indefinitely and ensures that logging is configured only once to
     avoid duplicate log entries.
 
     Args:
         log_folder (str): The directory where log files will be stored.
-        log_level_file (int, optional): Logging level for the file handler. Defaults to logging.INFO.
-        log_level_console (int, optional): Logging level for the console handler. Defaults to logging.WARNING.
-        max_bytes (int, optional): Maximum size in bytes for a single log file before rotation. Defaults to 5 MB.
-        backup_count (int, optional): Number of backup log files to keep. Defaults to 5.
+        log_level_file (str, optional): Logging level for the file sink. Defaults to "INFO".
+        log_level_console (str, optional): Logging level for the console sink. Defaults to "WARNING".
+        rotation (str, optional): Log rotation criteria. Defaults to "5 MB".
+        retention (int, optional): Number of backup log files to keep. Defaults to 5.
 
     Raises:
         OSError: If the log directory cannot be created due to permission issues or other OS-related errors.
@@ -66,39 +65,41 @@ def setup_logging(
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         log_file = log_dir / f"nlm_{timestamp}.log"
 
-        # Create a custom logger
-        logger = logging.getLogger()
-        logger.setLevel(logging.DEBUG)  # Set the root logger level to DEBUG
+        # Remove any default Loguru sinks to prevent duplicate logs
+        logger.remove()
 
-        # File Handler with log rotation
-        file_handler = RotatingFileHandler(
-            filename=str(log_file),
-            maxBytes=max_bytes,
-            backupCount=backup_count,
-            encoding="utf-8",  # Specify encoding for consistency
+        # Add File Sink with log rotation and retention
+        logger.add(
+            log_file,
+            level=log_level_file,
+            rotation=rotation,
+            retention=retention,
+            encoding="utf-8",
+            enqueue=True,  # Ensures thread-safe logging
+            serialize=False,  # Set to True if you prefer JSON logs
         )
-        file_handler.setLevel(log_level_file)  # Set file handler level
 
-        # Console Handler for critical issues
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setLevel(log_level_console)  # Set console handler level
-
-        # Create formatter and add it to the handlers
-        formatter = logging.Formatter(
-            fmt="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
+        # Add Console Sink with specified log level
+        logger.add(
+            sys.stdout,
+            level=log_level_console,
+            format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
+            "<level>{level: <8}</level> | "
+            "{message}",
+            colorize=True,
+            enqueue=True,
         )
-        file_handler.setFormatter(formatter)
-        console_handler.setFormatter(formatter)
 
-        # Add the handlers to the logger
-        logger.addHandler(file_handler)
-        logger.addHandler(console_handler)
+        # Suppress logs from specific libraries if necessary
+        # Example: Suppressing matplotlib logs
+        logger.configure(extra={"matplotlib": {"level": "ERROR"}})
 
         # Log the initialization
-        logging.getLogger("matplotlib").setLevel(logging.ERROR)
+        logger.debug("Logging has been configured successfully.")
+
         _logger_initialized = True  # Mark logger as initialized
 
     except OSError as e:
         print(f"Failed to create log directory '{log_folder}': {e}", file=sys.stderr)
         raise
+

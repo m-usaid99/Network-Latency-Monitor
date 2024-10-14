@@ -134,4 +134,21 @@ def parse_arguments() -> argparse.Namespace:
         help="Automatically confirm prompts.",
     )
 
+    # Verbosity flags
+    verbosity = parser.add_argument_group("Verbosity Options")
+
+    verbosity.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        help="Suppress all non-critical output.",
+    )
+    verbosity.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        help="Increase output verbosity. Use -v for verbose and -vv for debug.",
+    )
+
     return parser.parse_args()

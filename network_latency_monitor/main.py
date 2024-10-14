@@ -16,6 +16,7 @@ import asyncio
 import sys
 from collections import deque
 
+from loguru import logger  # Import Loguru's logger
 from rich.console import Console
 
 from network_latency_monitor import (
@@ -84,22 +85,50 @@ async def main():
     # Validate configuration
     validate_config(config)
 
-    # Setup logging (logs are written to files only)
-    setup_logging(config.get("log_dir"))
+    # Determine verbosity level and map to log levels
+    if args.quiet:
+        # Quiet Mode: Only ERROR and CRITICAL logs
+        log_level_file = "ERROR"
+        log_level_console = "ERROR"
+    else:
+        # Start with default log levels
+        log_level_file = "INFO"
+        log_level_console = "WARNING"
+
+        # Adjust log levels based on verbosity
+        if args.verbose == 1:
+            # Verbose Mode: DEBUG logs for file, INFO for console
+            log_level_file = "DEBUG"
+            log_level_console = "INFO"
+        elif args.verbose >= 2:
+            # Debug Mode: TRACE logs for file, DEBUG for console
+            log_level_file = "DEBUG"  # Loguru does not have TRACE by default
+            log_level_console = "DEBUG"
+
+    # Setup logging with determined log levels
+    setup_logging(
+        log_folder=config.get("log_dir"),
+        log_level_file=log_level_file,
+        log_level_console=log_level_console,
+    )
 
     # Handle clear operations if any
     handle_clear_operations(config)
 
     # If file mode is enabled, process the file directly
     if config.get("file"):
+        logger.info("Processing file mode.")
         process_file_mode(config)
+        logger.info("File processing completed.")
         sys.exit(0)  # Exit after processing the file
 
     # Validate IP addresses
     config["ip_addresses"] = validate_and_get_ips(config)
+    logger.debug(f"Validated IP addresses: {config['ip_addresses']}")
 
     # Create results subdirectory with timestamp
     results_subfolder = create_results_directory(config)
+    logger.info(f"Results will be stored in: {results_subfolder}")
 
     # Initialize in-memory latency data storage
     latency_window = 30  # Number of data points in the sliding window
@@ -107,6 +136,7 @@ async def main():
         ip: deque([0] * latency_window, maxlen=latency_window)
         for ip in config["ip_addresses"]
     }
+    logger.debug(f"Initialized latency data storage: {latency_data}")
 
     # Start ping monitoring with enhanced progress bars and real-time charts
     console.print("[bold blue]Starting ping monitoring...[/bold blue]")
@@ -115,6 +145,7 @@ async def main():
 
     # Process ping results
     data_dict = process_ping_results(results_subfolder, config)
+    logger.debug(f"Processed ping results: {data_dict}")
 
     # Generate plots and display summary statistics
     display_plots_and_summary(data_dict, config)
@@ -134,6 +165,7 @@ def cli():
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
+        logger.error("Ping monitoring interrupted by user.")
         console.print("\n[bold red]Ping monitoring interrupted by user.[/bold red]")
         sys.exit(0)
 
