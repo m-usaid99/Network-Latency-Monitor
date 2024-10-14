@@ -161,7 +161,7 @@ async def main():
     logger.info("Ping monitoring initiated.")
     # Start ping monitoring with or without console output based on verbosity
     if verbosity == -1:
-        await run_ping_monitoring_quiet(config, results_subfolder, latency_data)
+        await run_ping_monitoring_quiet(config, results_subfolder)
     else:
         await run_ping_monitoring(config, results_subfolder, latency_data)
     logger.info("Ping monitoring completed.")

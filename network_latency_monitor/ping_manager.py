@@ -317,11 +317,7 @@ async def run_ping_monitoring(config, results_subfolder, latency_data):
 
 
 async def run_ping_quiet(
-    ip_address: str,
-    duration: int,
-    interval: int,
-    results_file: Path,
-    latency_data: Dict[str, deque],
+    ip_address: str, duration: int, interval: int, results_file: Path
 ):
     """
     Executes the ping command for a specific IP address, records latency, without console output.
@@ -375,19 +371,11 @@ async def run_ping_quiet(
             with results_file.open("a", encoding="utf-8") as f:
                 f.write(f"Error: {e}\n")
 
-        finally:
-            # Update in-memory latency data
-            if current_latency is not None:
-                latency_data[ip_address].append(current_latency)
-            else:
-                # Append 0 to represent lost ping
-                latency_data[ip_address].append(0)
-
         # Sleep until the next interval
         await asyncio.sleep(interval)
 
 
-async def run_ping_monitoring_quiet(config, results_subfolder, latency_data):
+async def run_ping_monitoring_quiet(config, results_subfolder):
     """
     Initiates ping monitoring for multiple IP addresses without console output.
     """
@@ -404,7 +392,6 @@ async def run_ping_monitoring_quiet(config, results_subfolder, latency_data):
                 duration=duration,
                 interval=ping_interval,
                 results_file=results_file,
-                latency_data=latency_data,
             )
         )
         tasks.append(task)
