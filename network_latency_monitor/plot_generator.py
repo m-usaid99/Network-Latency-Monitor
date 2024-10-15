@@ -14,17 +14,17 @@ Functions:
     - display_plots_and_summary: Generates plots and displays summary statistics.
 """
 
-import logging
-import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
-import seaborn as sns
-import pandas as pd
-from typing import Dict, Optional
 from pathlib import Path
-from rich.table import Table
-from rich.console import Console
+from typing import Dict, Optional
 
-console = Console()
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
+from loguru import logger  # Use loguru logger
+from rich.table import Table
+
+from network_latency_monitor.console_manager import console_proxy  # Use custom console
 
 
 def display_summary(data_dict: Dict[str, Dict[str, pd.DataFrame]]) -> None:
@@ -95,7 +95,7 @@ def display_summary(data_dict: Dict[str, Dict[str, pd.DataFrame]]) -> None:
             max_latency_display,
         )
 
-    console.print(table)
+    console_proxy.console.print(table)
 
 
 def generate_plots(
@@ -146,11 +146,12 @@ def generate_plots(
     plots_subdir = plots_dir / f"plots_{timestamp}"
     try:
         plots_subdir.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Created plots subdirectory: {plots_subdir}")
     except OSError as e:
-        console.print(
+        console_proxy.console.print(
             f"[bold red]Failed to create plots subdirectory {plots_subdir}: {e}[/bold red]"
         )
-        logging.error(f"Failed to create plots subdirectory {plots_subdir}: {e}")
+        logger.error(f"Failed to create plots subdirectory {plots_subdir}: {e}")
         return  # Exit the function if the directory cannot be created
 
     # Determine the maximum duration based on the data
@@ -164,15 +165,18 @@ def generate_plots(
             and not raw_df["Time (s)"].isnull().all()
         )
         max_duration = int(max_duration)
+        logger.debug(f"Maximum duration determined: {max_duration} seconds")
     except ValueError:
-        console.print(
+        console_proxy.console.print(
             "[bold red]No valid 'Time (s)' data found in 'raw' datasets.[/bold red]"
         )
-        logging.error("No valid 'Time (s)' data found in 'raw' datasets.")
+        logger.error("No valid 'Time (s)' data found in 'raw' datasets.")
         return
     except Exception as e:
-        console.print(f"[bold red]Error determining maximum duration: {e}[/bold red]")
-        logging.error(f"Error determining maximum duration: {e}")
+        console_proxy.console.print(
+            f"[bold red]Error determining maximum duration: {e}[/bold red]"
+        )
+        logger.error(f"Error determining maximum duration: {e}")
         return
 
     # If no segmentation is requested, generate a single plot
@@ -188,6 +192,7 @@ def generate_plots(
             min(start + segment_duration, max_duration) for start in segment_starts
         ]
         segment_labels = [f"hour_{i+1}" for i in range(len(segment_starts))]
+        logger.debug(f"Segmentation labels: {segment_labels}")
 
     for segment_start, segment_end, segment_label in zip(
         segment_starts, segment_ends, segment_labels
@@ -203,17 +208,20 @@ def generate_plots(
             color = palette[idx % len(palette)]
 
             if raw_df is None:
-                console.print(f"[yellow]No raw data available for IP: {ip}.[/yellow]")
+                console_proxy.console.print(
+                    f"[yellow]No raw data available for IP: {ip}.[/yellow]"
+                )
+                logger.warning(f"No raw data available for IP: {ip}.")
                 continue
 
             plot_raw_df = raw_df.copy()
 
             # Ensure 'Ping (ms)' column exists
             if "Ping (ms)" not in plot_raw_df.columns:
-                console.print(
+                console_proxy.console.print(
                     f"[bold red]Missing 'Ping (ms)' column for IP: {ip}.[/bold red]"
                 )
-                logging.error(f"Missing 'Ping (ms)' column for IP: {ip}.")
+                logger.error(f"Missing 'Ping (ms)' column for IP: {ip}.")
                 continue
 
             # Fill NaN values and clip to avoid extreme values
@@ -222,10 +230,10 @@ def generate_plots(
 
             # Ensure 'Time (s)' column exists
             if "Time (s)" not in plot_raw_df.columns:
-                console.print(
+                console_proxy.console.print(
                     f"[bold red]Missing 'Time (s)' column for IP: {ip}.[/bold red]"
                 )
-                logging.error(f"Missing 'Time (s)' column for IP: {ip}.")
+                logger.error(f"Missing 'Time (s)' column for IP: {ip}.")
                 continue
 
             # Filter data for the current segment
@@ -235,9 +243,10 @@ def generate_plots(
             ]
 
             if segment_data.empty:
-                console.print(
+                console_proxy.console.print(
                     f"[yellow]No data available for IP: {ip} in segment '{segment_label}'.[/yellow]"
                 )
+                logger.warning(f"No data for IP: {ip} in segment '{segment_label}'.")
                 continue
 
             # Plot Raw Ping with increased opacity
@@ -256,6 +265,9 @@ def generate_plots(
             ]
             if not high_latency_raw.empty:
                 high_latency_times.extend(high_latency_raw["Time (s)"].tolist())
+                logger.debug(
+                    f"High latency times for IP {ip}: {high_latency_raw['Time (s)'].tolist()}"
+                )
 
             if agg_df is not None:
                 # Ensure 'Mean Latency (ms)' and 'Time (s)' columns exist
@@ -263,10 +275,10 @@ def generate_plots(
                     "Mean Latency (ms)" not in agg_df.columns
                     or "Time (s)" not in agg_df.columns
                 ):
-                    console.print(
+                    console_proxy.console.print(
                         f"[bold red]Missing 'Mean Latency (ms)' or 'Time (s)' column in aggregated data for IP: {ip}.[/bold red]"
                     )
-                    logging.error(
+                    logger.error(
                         f"Missing 'Mean Latency (ms)' or 'Time (s)' column in aggregated data for IP: {ip}."
                     )
                     continue
@@ -278,8 +290,11 @@ def generate_plots(
                 ]
 
                 if agg_segment.empty:
-                    console.print(
+                    console_proxy.console.print(
                         f"[yellow]No aggregated data available for IP: {ip} in segment '{segment_label}'.[/yellow]"
+                    )
+                    logger.warning(
+                        f"No aggregated data for IP: {ip} in segment '{segment_label}'."
                     )
                     continue
 
@@ -323,6 +338,7 @@ def generate_plots(
                     alpha=0.1,
                     label="High Latency" if region == shading_regions[0] else "",
                 )
+            logger.debug(f"Shading regions: {shading_regions}")
 
         # Customize Legend to avoid duplicate labels
         handles, labels = plt.gca().get_legend_handles_labels()
@@ -359,10 +375,15 @@ def generate_plots(
         try:
             plt.savefig(plot_path)
             plt.close()
-            console.print(f"[bold green]Generated plot:[/bold green] {plot_path}")
+            console_proxy.console.print(
+                f"[bold green]Generated plot:[/bold green] {plot_path}"
+            )
+            logger.info(f"Generated plot: {plot_path}")
         except Exception as e:
-            console.print(f"[bold red]Failed to save plot {plot_path}: {e}[/bold red]")
-            logging.error(f"Failed to save plot {plot_path}: {e}")
+            console_proxy.console.print(
+                f"[bold red]Failed to save plot {plot_path}: {e}[/bold red]"
+            )
+            logger.error(f"Failed to save plot {plot_path}: {e}")
 
 
 def display_plots_and_summary(
@@ -391,7 +412,8 @@ def display_plots_and_summary(
 
     # Generate plots if data is available
     if data_dict:
-        console.print("[bold blue]Generating plots...[/bold blue]")
+        console_proxy.console.print("[bold blue]Generating plots...[/bold blue]")
+        logger.info("Generating plots...")
         try:
             generate_plots(
                 config=config,
@@ -399,26 +421,38 @@ def display_plots_and_summary(
                 latency_threshold=latency_threshold,
                 no_segmentation=no_segmentation,
             )
-            console.print("[bold green]Plot generation completed.[/bold green]")
+            console_proxy.console.print(
+                "[bold green]Plot generation completed.[/bold green]"
+            )
+            logger.info("Plot generation completed.")
         except Exception as e:
-            console.print(
+            console_proxy.console.print(
                 f"[bold red]An error occurred during plot generation: {e}[/bold red]"
             )
-            logging.error(f"An error occurred during plot generation: {e}")
+            logger.error(f"An error occurred during plot generation: {e}")
     else:
-        console.print("[bold red]No data available for plotting.[/bold red]")
-        logging.warning("No data available for plotting.")
+        console_proxy.console.print(
+            "[bold red]No data available for plotting.[/bold red]"
+        )
+        logger.warning("No data available for plotting.")
 
     # Display summary statistics
     if data_dict:
-        console.print("[bold blue]Displaying Summary Statistics...[/bold blue]")
+        console_proxy.console.print(
+            "[bold blue]Displaying Summary Statistics...[/bold blue]"
+        )
+        logger.info("Displaying Summary Statistics...")
         try:
             display_summary(data_dict)
+            logger.info("Displayed summary statistics.")
         except Exception as e:
-            console.print(
+            console_proxy.console.print(
                 f"[bold red]An error occurred while displaying summary statistics: {e}[/bold red]"
             )
-            logging.error(f"An error occurred while displaying summary statistics: {e}")
+            logger.error(f"An error occurred while displaying summary statistics: {e}")
     else:
-        console.print("[bold red]No data available for summary statistics.[/bold red]")
-        logging.warning("No data available for summary statistics.")
+        console_proxy.console.print(
+            "[bold red]No data available for summary statistics.[/bold red]"
+        )
+        logger.warning("No data available for summary statistics.")
+
