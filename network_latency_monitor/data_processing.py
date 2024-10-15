@@ -16,15 +16,15 @@ Functions:
 """
 
 import sys
-import matplotlib.pyplot as plt
-import pandas as pd
-import logging
 from typing import List, Tuple, Dict, Optional
 from pathlib import Path
-from rich.console import Console
-from .plot_generator import generate_plots
 
-console = Console()
+import matplotlib.pyplot as plt
+import pandas as pd
+from loguru import logger  # Use loguru logger
+
+from network_latency_monitor.console_manager import console_proxy  # Use custom console
+from .plot_generator import generate_plots
 
 
 def process_file_mode(config: Dict):
@@ -44,9 +44,10 @@ def process_file_mode(config: Dict):
     file_path = config.get("file")
     if file_path:
         file_path_obj = Path(file_path)  # Convert to Path object for path operations
-        console.print(
+        console_proxy.console.print(
             f"[bold green]Processing ping result file:[/bold green] {file_path_obj}"
         )
+        logger.info(f"Processing ping result file: {file_path_obj}")
         process_ping_file(
             file_path=str(
                 file_path_obj
@@ -56,7 +57,10 @@ def process_file_mode(config: Dict):
             duration=config.get("duration", 10800),
             latency_threshold=config.get("latency_threshold", 200.0),
         )
-        console.print("[bold green]Processing of ping file completed.[/bold green]")
+        console_proxy.console.print(
+            "[bold green]Processing of ping file completed.[/bold green]"
+        )
+        logger.info("Processing of ping file completed.")
         sys.exit(0)  # Exit after processing file
 
 
@@ -96,13 +100,13 @@ def extract_ping_times(file_path: str) -> List[Optional[float]]:
                     except ValueError:
                         # Handle unexpected line format
                         ping_times.append(None)
-                        logging.warning(
+                        logger.warning(
                             f"Unexpected line format in {file_path_obj}: {line}"
                         )
     except FileNotFoundError:
-        logging.error(f"Ping result file {file_path_obj} not found.")
+        logger.error(f"Ping result file {file_path_obj} not found.")
     except Exception as e:
-        logging.error(f"Error extracting ping times from {file_path_obj}: {e}")
+        logger.error(f"Error extracting ping times from {file_path_obj}: {e}")
 
     return ping_times
 
@@ -150,6 +154,9 @@ def aggregate_ping_times(
             mean_latency = sum(successful_pings) / len(successful_pings)
         else:
             mean_latency = 0.0  # Indicate all pings lost
+            logger.warning(
+                f"All pings lost in interval {start}-{end} seconds. Mean Latency set to 0.0 ms."
+            )
 
         midpoint_time = start + (interval / 2)
         aggregated_data.append((midpoint_time, mean_latency, packet_loss))
@@ -167,14 +174,12 @@ def aggregate_ping_times(
             mean_latency = sum(successful_pings) / len(successful_pings)
         else:
             mean_latency = 0.0
+            logger.warning(
+                f"All pings lost in remaining interval {total_intervals * interval}-{total_intervals * interval + len(remaining_pings)} seconds. Mean Latency set to 0.0 ms."
+            )
 
         midpoint_time = total_intervals * interval + (len(remaining_pings) / 2)
         aggregated_data.append((midpoint_time, mean_latency, packet_loss))
-
-        if lost_pings == len(remaining_pings):
-            logging.warning(
-                f"All pings lost in remaining interval {total_intervals * interval}-{total_intervals * interval + len(remaining_pings)} seconds. Mean Latency set to 0.0 ms at {midpoint_time}s."
-            )
 
     return aggregated_data
 
@@ -219,17 +224,20 @@ def process_ping_results(
         ip_address = file_path_obj.stem[len("ping_results_") :]
         ping_times = extract_ping_times(file_path)
         if not ping_times:
-            console.print(
+            console_proxy.console.print(
                 f"[bold red]No ping times extracted from {file_path_obj}. Skipping.[/bold red]"
             )
-            logging.warning(f"No ping times extracted from {file_path_obj}. Skipping.")
+            logger.warning(f"No ping times extracted from {file_path_obj}. Skipping.")
             continue
 
         # Determine if aggregation should be enforced based on duration
         duration = config.get("duration", 10800)
         if duration < 60:
-            console.print(
+            console_proxy.console.print(
                 f"[bold yellow]Duration ({duration}s) is less than 60 seconds. Aggregation disabled for {ip_address}.[/bold yellow]"
+            )
+            logger.info(
+                f"Duration ({duration}s) is less than 60 seconds. Aggregation disabled for {ip_address}."
             )
             aggregate = False
         else:
@@ -246,6 +254,7 @@ def process_ping_results(
             agg_df["Packet Loss (%)"] = agg_df["Packet Loss (%)"].fillna(
                 100.0
             )  # If packet loss is NaN, assume 100%
+            logger.debug(f"Aggregated data for {ip_address}: {agg_df.head()}")
         else:
             agg_df = None
 
@@ -256,6 +265,7 @@ def process_ping_results(
 
         # Store data
         data_dict[ip_address] = {"raw": raw_df, "aggregated": agg_df}
+        logger.info(f"Processed ping results for IP: {ip_address}")
 
     return data_dict
 
@@ -289,12 +299,15 @@ def process_ping_file(
     ping_times = extract_ping_times(file_path)
 
     if not ping_times:
-        logging.warning(f"No ping times extracted from {file_path}. Skipping plot.")
+        logger.warning(f"No ping times extracted from {file_path}. Skipping plot.")
         return
 
     # Determine if aggregation should be enforced based on duration
     if duration < 60:
         aggregate = False
+        logger.info(
+            f"Duration ({duration}s) is less than 60 seconds. Aggregation disabled for {ip_address}."
+        )
     else:
         aggregate = not no_aggregation
 
@@ -304,6 +317,7 @@ def process_ping_file(
             aggregated_data,
             columns=["Time (s)", "Mean Latency (ms)", "Packet Loss (%)"],
         )
+        logger.debug(f"Aggregated data for {ip_address}: {agg_df.head()}")
     else:
         agg_df = None
 
@@ -327,6 +341,7 @@ def process_ping_file(
         y_max = overall_max_ping * 1.05  # Add 5% padding
 
     plt.ylim(0, y_max)
+    logger.debug(f"Set y-axis limit to {y_max} ms for plotting.")
 
     # Prepare data dictionary
     data_dict = {ip_address: {"raw": raw_df, "aggregated": agg_df}}
@@ -337,12 +352,14 @@ def process_ping_file(
     plot_subfolder = plots_folder / f"plots_{current_date}"
     try:
         plot_subfolder.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Created plot subdirectory: {plot_subfolder}")
     except Exception as e:
-        logging.error(f"Failed to create plot subdirectory {plot_subfolder}: {e}")
-        console.print(
+        logger.error(f"Failed to create plot subdirectory {plot_subfolder}: {e}")
+        console_proxy.console.print(
             f"[bold red]Failed to create plot subdirectory {plot_subfolder}: {e}[/bold red]"
         )
         sys.exit(1)
 
     # Generate and save the plot
     generate_plots(config, data_dict, latency_threshold)
+    logger.info(f"Generated plot for IP: {ip_address}")

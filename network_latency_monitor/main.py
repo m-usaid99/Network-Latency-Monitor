@@ -40,6 +40,7 @@ from network_latency_monitor.console_manager import NullConsole, console_proxy
 #                   - refactor log statements in all files to use loguru
 #                   - refactor plot_generator.py to suppress console output for -q
 #                   - update documentation for verbosity flags
+#                   - test verbosity option in config file
 #                   - incorporate use of --yes flag
 #                       - fix console.print statements in config.py
 #                       - bypass warnings and confirmations
