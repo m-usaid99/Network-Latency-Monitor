@@ -110,7 +110,7 @@ Before running NLM, configure your settings in the
 **Sample `config.yaml`:**
 
 ```yaml
-"duration": 10800,  # in seconds
+"duration": 10800,
 "ip_addresses": ["8.8.8.8"],
 "ping_interval": 1,  # in seconds
 "latency_threshold": 200.0,  # in ms
@@ -122,6 +122,7 @@ Before running NLM, configure your settings in the
 "clear_plots": False,  # Set to True to clear plots folder
 "clear_logs": False,  # Set to True to clear logs folder
 "yes": False,  # Set to True to auto-confirm prompts
+"verbosity": 0  # 0: Normal, 1: Verbose, 2: Debug
 ```
 
 The `config.yaml` file is auto-generated the first time that
@@ -132,7 +133,7 @@ For Linux users: `/home/username/.config/network_latency_monitor/config.yaml`
 For Windows users: `%APPDATA%\nlm\config.yaml`
 For MacOS users: `~/Library/Application Support/nlm/config.yaml`
 
-## Running the Program
+### Running the Program
 
 **Running from Source**
 
@@ -205,6 +206,24 @@ nlm --help
 
   ```bash
   nlm 8.8.8.8 --duration 7200
+  ```
+
+- Run the program with default parameters, but no output to the terminal:
+
+  ```bash
+  nlm -q
+  ```
+
+- Run the program with log-level information printed to the terminal:
+
+  ```bash
+  nlm -v
+  ```
+
+- Run the program with debug-level logs printed to the terminal:
+
+  ```bash
+  nlm -vv
   ```
 
 - Clear only the plots folder:
