@@ -26,6 +26,9 @@ from rich.prompt import Prompt
 # Initialize Rich Console
 console = Console()
 
+# FIX: - incorporate --yes check wherever possible
+#      - test verbosity config value
+
 # Define the default configuration dictionary
 DEFAULT_CONFIG = {
     "duration": 10800,  # in seconds

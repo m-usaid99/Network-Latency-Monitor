@@ -36,11 +36,11 @@ from network_latency_monitor import (
 from network_latency_monitor.ping_manager import run_ping_monitoring_quiet
 from network_latency_monitor.console_manager import NullConsole, console_proxy
 
-# TODO: (15/10/24)  - implement verbosity levels
-#                   - refactor log statements in all files to use loguru
-#                   - refactor plot_generator.py to suppress console output for -q
+# TODO: (15/10/24)  - implement verbosity levels (done)
+#                   - refactor log statements in all files to use loguru (done)
+#                   - refactor plot_generator.py to suppress console output for -q (done)
+#                   - test verbosity option in config file (done)
 #                   - update documentation for verbosity flags
-#                   - test verbosity option in config file
 #                   - incorporate use of --yes flag
 #                       - fix console.print statements in config.py
 #                       - bypass warnings and confirmations
