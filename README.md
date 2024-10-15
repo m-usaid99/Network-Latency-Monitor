@@ -271,21 +271,14 @@ This project is licensed under the MIT License. See the [LICENSE](./LICENSE) fil
 
 The following features and improvements are planned for future releases of **NLM (Network Latency Monitor)**:
 
-1. **Improve `argparse` Functionality**:
+1. **Add Support for Multiple Protocols**: Extend support for protocols beyond ICMP (e.g., TCP, UDP) to enable more comprehensive network monitoring.
 
-   - Add Verbosity Levels: Introduce options to control output verbosity (e.g., `-v` for verbose mode, `-q` for quiet mode).
-   - Enhanced Error Handling: Improve feedback and error reporting for invalid inputs or failed pings.
+2. **Data Export Options**: Allow users to export monitoring data in multiple formats such as CSV, JSON, and XML for easier data processing and analysis.
 
-    <br/>
-
-2. **Add Support for Multiple Protocols**: Extend support for protocols beyond ICMP (e.g., TCP, UDP) to enable more comprehensive network monitoring.
-
-3. **Data Export Options**: Allow users to export monitoring data in multiple formats such as CSV, JSON, and XML for easier data processing and analysis.
-
-4. **Custom Results and Plots Directory**:
+3. **Custom Results and Plots Directory**:
    Add command-line options to specify custom directories for storing results and plots, making the tool more flexible for use in shell scripts and automated environments.
 
-5. **Improved Plotting Options** (Future): Enhance plotting capabilities with customizable graph styles, better scaling, and export options to PNG and other formats.
+4. **Improved Plotting Options** (Future): Enhance plotting capabilities with customizable graph styles, better scaling, and export options to PNG and other formats.
 
 ## Support
 

@@ -63,3 +63,75 @@ To view all command-line options and a simple guide, run
     nlm --help
 
 This will run the program with default parameters as obtained from `config.yaml`.
+
+Usage Examples
+~~~~~~~~~~~~~~
+
+-  Monitor two IP addresses for 1 hour with a 2-second interval between
+   pings:
+
+   .. code:: bash
+
+      nlm 8.8.8.8 1.1.1.1 --duration 3600 --ping-interval 2
+
+-  Process an existing ping results file and disable data aggregation:
+
+   .. code:: bash
+
+      nlm --file results/ping_results_8.8.8.8.txt --no-aggregation
+
+-  Clear all data (results, plots, logs) without confirmation:
+
+   .. code:: bash
+
+      nlm --clear --yes
+
+-  Monitor a single IP address with a custom latency threshold:
+
+   .. code:: bash
+
+      nlm 8.8.4.4 --latency-threshold 150.0
+
+-  Regenerate the default ``config.yaml`` file:
+
+   .. code:: bash
+
+      nlm --regen-config
+
+-  Disable segmentation of latency plots:
+
+   .. code:: bash
+
+      nlm 8.8.8.8 --no-segmentation
+
+-  Monitor a single IP for 2 hours, with default settings:
+
+   .. code:: bash
+
+      nlm 8.8.8.8 --duration 7200
+
+-  Run the program with default parameters, but no output to the
+   terminal:
+
+   .. code:: bash
+
+      nlm -q
+
+-  Run the program with log-level information printed to the terminal:
+
+   .. code:: bash
+
+      nlm -v
+
+-  Run the program with debug-level logs printed to the terminal:
+
+   .. code:: bash
+
+      nlm -vv
+
+-  Clear only the plots folder:
+
+   .. code:: bash
+
+      nlm --clear-plots
+
