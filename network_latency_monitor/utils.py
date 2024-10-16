@@ -24,7 +24,7 @@ from typing import Dict, List
 
 from rich.prompt import Prompt
 
-from loguru import logger  # Use loguru logger
+from loguru import logger  # Use Loguru logger
 from network_latency_monitor.console_manager import console_proxy  # Use custom console
 
 
@@ -99,7 +99,7 @@ def handle_clear_operations(config: Dict) -> None:
     folders_to_clear = []
     confirmation_message = ""
 
-    # Check if any clear operation is requested
+    # Determine which folders to clear based on flags
     if config.get("clear", False):
         folders_to_clear = [
             config.get("results_dir"),
@@ -121,7 +121,7 @@ def handle_clear_operations(config: Dict) -> None:
                 "Are you sure you want to clear the selected data? [y/n]"
             )
 
-    # Convert folder paths to Path objects
+    # Convert folder paths to Path objects and filter out None values
     folders_to_clear = [Path(folder) for folder in folders_to_clear if folder]
 
     if folders_to_clear:
@@ -226,3 +226,4 @@ def create_results_directory(config: Dict) -> Path:
         )
         sys.exit(1)
     return results_subfolder
+
