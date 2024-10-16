@@ -37,7 +37,7 @@ from network_latency_monitor.ping_manager import run_ping_monitoring_quiet
 from network_latency_monitor.console_manager import NullConsole, console_proxy
 from network_latency_monitor.config import DEFAULT_CONFIG
 
-# TODO: (16/10/24) - incorporate --version flag
+# TODO: (16/10/24)
 
 
 async def main():
