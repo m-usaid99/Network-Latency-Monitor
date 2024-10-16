@@ -27,7 +27,7 @@ from rich.prompt import Prompt
 console = Console()
 
 # FIX: - incorporate --yes check wherever possible
-#      - test verbosity config value
+#      - test verbosity config value (done)
 
 # Define the default configuration dictionary
 DEFAULT_CONFIG = {
