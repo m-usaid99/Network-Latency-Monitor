@@ -12,6 +12,7 @@ Functions:
 """
 
 import argparse
+from importlib.metadata import version, PackageNotFoundError
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -92,6 +93,18 @@ def parse_arguments() -> argparse.Namespace:
         "--regen-config",
         action="store_true",
         help="Regenerate the default config.yaml file.",
+    )
+
+    try:
+        package_version = version("network-latency-monitor")
+    except PackageNotFoundError:
+        package_version = "unknown"
+
+    optional.add_argument(
+        "--version",
+        action="version",
+        version=f"NLM version {package_version}",
+        help="Show the application's version and exit.",
     )
 
     # Aggregation arguments

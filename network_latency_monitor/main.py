@@ -37,14 +37,7 @@ from network_latency_monitor.ping_manager import run_ping_monitoring_quiet
 from network_latency_monitor.console_manager import NullConsole, console_proxy
 from network_latency_monitor.config import DEFAULT_CONFIG
 
-# TODO: (16/10/24)  - implement verbosity levels (done)
-#                   - refactor log statements in all files to use loguru (done)
-#                   - refactor plot_generator.py to suppress console output for -q (done)
-#                   - test verbosity option in config file (done)
-#                   - update documentation for verbosity flags (done)
-#                   - incorporate use of --yes flag
-#                       - fix console.print statements in config.py
-#                       - bypass warnings and confirmations
+# TODO: (16/10/24) - incorporate --version flag
 
 
 async def main():
@@ -220,4 +213,3 @@ def cli():
 
 if __name__ == "__main__":
     cli()
-

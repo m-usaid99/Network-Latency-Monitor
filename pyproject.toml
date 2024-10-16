@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "network-latency-monitor"
-version = "0.2.1"
+version = "0.2.2"
 description = "Monitor your network latency using real-time plots and cumulative plots"
 authors = ["Muhammad Usaid Rehman <rehman.usaid@gmail.com>"]
 homepage = "https://github.com/m-usaid99/Network-Latency-Monitor"
@@ -43,4 +43,3 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
 nlm = "network_latency_monitor.main:cli"
-
