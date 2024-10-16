@@ -75,11 +75,6 @@ async def main():
     # Parse command-line arguments
     args = parse_arguments()
 
-    # Handle configuration regeneration
-    if args.regen_config:
-        regenerate_default_config()
-        sys.exit(0)
-
     # Load configuration
     config = load_config()
 
@@ -88,6 +83,11 @@ async def main():
 
     # Validate configuration
     validate_config(config)
+
+    # Handle configuration regeneration
+    if args.regen_config:
+        regenerate_default_config(config=config)
+        sys.exit(0)
 
     # Determine verbosity level and map to log levels
     verbosity = config.get("verbosity", 0)

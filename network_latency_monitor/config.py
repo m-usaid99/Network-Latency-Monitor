@@ -26,7 +26,8 @@ from rich.prompt import Prompt
 # Initialize Rich Console
 console = Console()
 
-# FIX: - incorporate --yes check wherever possible
+# FIX: - incorporate --yes check wherever possible (done)
+#      - refactor console.print statements
 #      - test verbosity config value (done)
 
 # Define the default configuration dictionary
@@ -151,12 +152,13 @@ def load_config(config_file: str = "config.yaml") -> Dict:
     return config
 
 
-def regenerate_default_config(config_file: str = "config.yaml"):
+def regenerate_default_config(config_file: str = "config.yaml", config: Dict = None):
     """
     Regenerate the config.yaml file with default settings after user confirmation.
 
     Args:
         config_file (str, optional): Path to the config file. Defaults to "config.yaml".
+        config (Dict, optional): Configuration dictionary. Used to check for auto-confirmation.
     """
     app_name = "network_latency_monitor"  # Replace with your actual application name
     dirs = get_standard_directories(app_name)
@@ -164,12 +166,17 @@ def regenerate_default_config(config_file: str = "config.yaml"):
     config_path = config_dir / config_file
 
     if config_path.exists():
-        # Prompt for confirmation
-        confirmation = Prompt.ask(
-            f"[bold yellow]Are you sure you want to regenerate the default '{config_path}'? This will overwrite your current configuration.[/bold yellow]",
-            choices=["y", "n"],
-            default="n",
-        )
+        # Check if auto-confirm is enabled
+        if config and config.get("yes", False):
+            confirmation = "y"
+            logging.debug("Auto-confirmation enabled. Proceeding without prompt.")
+        else:
+            # Prompt for confirmation
+            confirmation = Prompt.ask(
+                f"[bold yellow]Are you sure you want to regenerate the default '{config_path}'? This will overwrite your current configuration.[/bold yellow]",
+                choices=["y", "n"],
+                default="n",
+            )
         if confirmation.lower() not in ["y", "yes"]:
             console.print(
                 "[bold green]Configuration regeneration canceled.[/bold green]"
@@ -184,10 +191,12 @@ def regenerate_default_config(config_file: str = "config.yaml"):
         console.print(
             f"[bold green]Default configuration file regenerated at '{config_path}'. Please review and modify it as needed.[/bold green]"
         )
+        logging.info(f"Default configuration file regenerated at '{config_path}'.")
     except Exception as e:
         console.print(
             f"[bold red]Failed to regenerate config file '{config_path}': {e}[/bold red]"
         )
+        logging.error(f"Failed to regenerate config file '{config_path}': {e}")
         sys.exit(1)
 
     # Ensure data directories exist
@@ -199,10 +208,12 @@ def regenerate_default_config(config_file: str = "config.yaml"):
                 console.print(
                     f"[bold green]Created directory '{path}' for '{key}'.[/bold green]"
                 )
+                logging.info(f"Created directory '{path}' for '{key}'.")
             except Exception as e:
                 console.print(
                     f"[bold red]Failed to create directory '{path}' for '{key}': {e}[/bold red]"
                 )
+                logging.error(f"Failed to create directory '{path}' for '{key}': {e}")
                 sys.exit(1)
 
 
