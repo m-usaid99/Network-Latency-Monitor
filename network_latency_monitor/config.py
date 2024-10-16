@@ -13,22 +13,16 @@ Functions:
     - get_standard_directories: Retrieves standard directories based on the operating system.
 """
 
-import logging
 import sys
 from pathlib import Path
 from typing import Dict
 
 import yaml
 from appdirs import AppDirs
-from rich.console import Console
 from rich.prompt import Prompt
+from loguru import logger  # Use Loguru's logger
 
-# Initialize Rich Console
-console = Console()
-
-# FIX: - incorporate --yes check wherever possible (done)
-#      - refactor console.print statements
-#      - test verbosity config value (done)
+from network_latency_monitor.console_manager import console_proxy  # Use custom console
 
 # Define the default configuration dictionary
 DEFAULT_CONFIG = {
@@ -95,21 +89,24 @@ def load_config(config_file: str = "config.yaml") -> Dict:
     config_path = config_dir / config_file
 
     if config_path.exists():
-        logging.info(f"Loading existing configuration from '{config_path}'.")
+        logger.info(f"Loading existing configuration from '{config_path}'.")
         try:
             with config_path.open("r", encoding="utf-8") as f:
                 user_config = yaml.safe_load(f) or {}
             # Merge user_config into DEFAULT_CONFIG
             config = {**DEFAULT_CONFIG, **user_config}
-            logging.info("Configuration loaded successfully.")
+            logger.info("Configuration loaded successfully.")
         except yaml.YAMLError as e:
-            console.print(f"[bold red]Error parsing the config file: {e}[/bold red]")
-            logging.error(f"Error parsing the config file: {e}")
+            console_proxy.console.print(
+                f"[bold red]Error parsing the config file: {e}[/bold red]"
+            )
+            logger.error(f"Error parsing the config file: {e}")
             config = DEFAULT_CONFIG.copy()
         except Exception as e:
-            console.print(
+            console_proxy.console.print(
                 f"[bold red]Unexpected error loading config file '{config_path}': {e}[/bold red]"
             )
+            logger.error(f"Unexpected error loading config file '{config_path}': {e}")
             config = DEFAULT_CONFIG.copy()
     else:
         # Create config.yaml with default settings
@@ -117,14 +114,16 @@ def load_config(config_file: str = "config.yaml") -> Dict:
             config_dir.mkdir(parents=True, exist_ok=True)
             with config_path.open("w", encoding="utf-8") as f:
                 yaml.dump(DEFAULT_CONFIG, f, sort_keys=False)
-            console.print(
+            console_proxy.console.print(
                 f"[bold green]Default configuration file created at '{config_path}'. Please review and modify it as needed.[/bold green]"
             )
+            logger.info(f"Default configuration file created at '{config_path}'.")
             config = DEFAULT_CONFIG.copy()
         except Exception as e:
-            console.print(
+            console_proxy.console.print(
                 f"[bold red]Failed to create default config file '{config_path}': {e}[/bold red]"
             )
+            logger.error(f"Failed to create default config file '{config_path}': {e}")
             sys.exit(1)
 
     # Ensure data directories exist
@@ -133,13 +132,15 @@ def load_config(config_file: str = "config.yaml") -> Dict:
         if not path.exists():
             try:
                 path.mkdir(parents=True, exist_ok=True)
-                console.print(
+                console_proxy.console.print(
                     f"[bold green]Created directory '{path}' for '{key}'.[/bold green]"
                 )
+                logger.info(f"Created directory '{path}' for '{key}'.")
             except Exception as e:
-                console.print(
+                console_proxy.console.print(
                     f"[bold red]Failed to create directory '{path}' for '{key}': {e}[/bold red]"
                 )
+                logger.error(f"Failed to create directory '{path}' for '{key}': {e}")
                 sys.exit(1)
 
     # Add directory paths to config (do not write these to config.yaml)
@@ -169,7 +170,7 @@ def regenerate_default_config(config_file: str = "config.yaml", config: Dict = N
         # Check if auto-confirm is enabled
         if config and config.get("yes", False):
             confirmation = "y"
-            logging.debug("Auto-confirmation enabled. Proceeding without prompt.")
+            logger.debug("Auto-confirmation enabled. Proceeding without prompt.")
         else:
             # Prompt for confirmation
             confirmation = Prompt.ask(
@@ -178,9 +179,10 @@ def regenerate_default_config(config_file: str = "config.yaml", config: Dict = N
                 default="n",
             )
         if confirmation.lower() not in ["y", "yes"]:
-            console.print(
+            console_proxy.console.print(
                 "[bold green]Configuration regeneration canceled.[/bold green]"
             )
+            logger.info("Configuration regeneration canceled by the user.")
             return
 
     # Create config.yaml with default settings
@@ -188,15 +190,15 @@ def regenerate_default_config(config_file: str = "config.yaml", config: Dict = N
         config_dir.mkdir(parents=True, exist_ok=True)
         with config_path.open("w", encoding="utf-8") as f:
             yaml.dump(DEFAULT_CONFIG, f, sort_keys=False)
-        console.print(
+        console_proxy.console.print(
             f"[bold green]Default configuration file regenerated at '{config_path}'. Please review and modify it as needed.[/bold green]"
         )
-        logging.info(f"Default configuration file regenerated at '{config_path}'.")
+        logger.info(f"Default configuration file regenerated at '{config_path}'.")
     except Exception as e:
-        console.print(
+        console_proxy.console.print(
             f"[bold red]Failed to regenerate config file '{config_path}': {e}[/bold red]"
         )
-        logging.error(f"Failed to regenerate config file '{config_path}': {e}")
+        logger.error(f"Failed to regenerate config file '{config_path}': {e}")
         sys.exit(1)
 
     # Ensure data directories exist
@@ -205,15 +207,15 @@ def regenerate_default_config(config_file: str = "config.yaml", config: Dict = N
         if not path.exists():
             try:
                 path.mkdir(parents=True, exist_ok=True)
-                console.print(
+                console_proxy.console.print(
                     f"[bold green]Created directory '{path}' for '{key}'.[/bold green]"
                 )
-                logging.info(f"Created directory '{path}' for '{key}'.")
+                logger.info(f"Created directory '{path}' for '{key}'.")
             except Exception as e:
-                console.print(
+                console_proxy.console.print(
                     f"[bold red]Failed to create directory '{path}' for '{key}': {e}[/bold red]"
                 )
-                logging.error(f"Failed to create directory '{path}' for '{key}': {e}")
+                logger.error(f"Failed to create directory '{path}' for '{key}': {e}")
                 sys.exit(1)
 
 
@@ -274,14 +276,18 @@ def validate_config(config: Dict) -> None:
     """
     # Validate duration
     if not isinstance(config.get("duration"), int) or config["duration"] <= 0:
-        console.print("[bold red]Invalid duration in configuration.[/bold red]")
-        logging.error("Invalid duration in configuration.")
+        console_proxy.console.print(
+            "[bold red]Invalid duration in configuration.[/bold red]"
+        )
+        logger.error("Invalid duration in configuration.")
         sys.exit(1)
 
     # Validate ping_interval
     if not isinstance(config.get("ping_interval"), int) or config["ping_interval"] <= 0:
-        console.print("[bold red]Invalid ping_interval in configuration.[/bold red]")
-        logging.error("Invalid ping_interval in configuration.")
+        console_proxy.console.print(
+            "[bold red]Invalid ping_interval in configuration.[/bold red]"
+        )
+        logger.error("Invalid ping_interval in configuration.")
         sys.exit(1)
 
     # Validate latency_threshold
@@ -289,18 +295,18 @@ def validate_config(config: Dict) -> None:
         not isinstance(config.get("latency_threshold"), (float, int))
         or config["latency_threshold"] <= 0
     ):
-        console.print(
+        console_proxy.console.print(
             "[bold red]Invalid latency_threshold in configuration.[/bold red]"
         )
-        logging.error("Invalid latency_threshold in configuration.")
+        logger.error("Invalid latency_threshold in configuration.")
         sys.exit(1)
 
     # Validate ip_addresses
     if not isinstance(config.get("ip_addresses"), list) or not config["ip_addresses"]:
-        console.print(
+        console_proxy.console.print(
             "[bold red]No IP addresses specified in configuration.[/bold red]"
         )
-        logging.error("No IP addresses specified in configuration.")
+        logger.error("No IP addresses specified in configuration.")
         sys.exit(1)
 
     # Validate verbosity
@@ -309,9 +315,10 @@ def validate_config(config: Dict) -> None:
         # Quiet Mode
         pass  # No additional validation needed
     elif not isinstance(verbosity, int) or not (0 <= verbosity <= 2):
-        console.print(
+        console_proxy.console.print(
             "[bold red]Invalid verbosity level in configuration. Must be 0 (Normal), 1 (Verbose), or 2 (Debug). Use -q for Quiet Mode.[/bold red]"
         )
-        logging.error("Invalid verbosity level in configuration.")
+        logger.error("Invalid verbosity level in configuration.")
         sys.exit(1)
     # Additional validations can be added here as needed
+
