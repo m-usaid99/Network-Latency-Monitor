@@ -36,11 +36,11 @@ from network_latency_monitor import (
 from network_latency_monitor.ping_manager import run_ping_monitoring_quiet
 from network_latency_monitor.console_manager import NullConsole, console_proxy
 
-# TODO: (15/10/24)  - implement verbosity levels (done)
+# TODO: (16/10/24)  - implement verbosity levels (done)
 #                   - refactor log statements in all files to use loguru (done)
 #                   - refactor plot_generator.py to suppress console output for -q (done)
 #                   - test verbosity option in config file (done)
-#                   - update documentation for verbosity flags
+#                   - update documentation for verbosity flags (done)
 #                   - incorporate use of --yes flag
 #                       - fix console.print statements in config.py
 #                       - bypass warnings and confirmations
@@ -197,7 +197,7 @@ def cli():
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        logger.warning("Ping monitoring interrupted by user.")
+        logger.info("Ping monitoring interrupted by user.")
         verbosity = 0
         try:
             config = load_config()
